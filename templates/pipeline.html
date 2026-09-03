@@ -1,0 +1,404 @@
+{% extends "base.html" %}
+
+{% block title %}Pipelines - IPL Data Platform{% endblock %}
+{% block header_title %}Data Pipeline Controller{% endblock %}
+
+{% block content %}
+<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; align-items: flex-start;">
+    <!-- Form Panel -->
+    <div class="panel">
+        <h3 style="margin-bottom: 1rem;"><i class="fa-solid fa-wand-magic-sparkles" style="color: var(--primary-cyan); margin-right: 8px;"></i> Trigger Execution</h3>
+        <form action="{{ url_for('pipeline.trigger') }}" method="POST" style="display: flex; flex-direction: column; gap: 1.25rem;">
+            
+            <div class="form-group">
+                <label class="form-label">Processing Mode</label>
+                <div style="display: flex; gap: 1.5rem;">
+                    <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+                        <input type="radio" name="mode" value="single" checked onclick="toggleModeInputs('single')">
+                        <span>Single Year</span>
+                    </label>
+                    <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+                        <input type="radio" name="mode" value="range" onclick="toggleModeInputs('range')">
+                        <span>Year Range</span>
+                    </label>
+                    <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+                        <input type="radio" name="mode" value="multiple" onclick="toggleModeInputs('multiple')">
+                        <span>Multiple Years</span>
+                    </label>
+                </div>
+            </div>
+
+            <!-- Single Year Selector -->
+            <div id="single-mode-input" class="form-group mode-input">
+                <label class="form-label" for="single_year">Select Year</label>
+                <select name="single_year" id="single_year" class="form-select">
+                    {% for y in range(2026, 2007, -1) %}
+                        <option value="{{ y }}">{{ y }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <!-- Year Range Selector -->
+            <div id="range-mode-input" class="form-group mode-input" style="display: none;">
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                    <div class="form-group">
+                        <label class="form-label" for="from_year">From Year</label>
+                        <select name="from_year" id="from_year" class="form-select">
+                            {% for y in range(2008, 2027) %}
+                                <option value="{{ y }}">{{ y }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label" for="to_year">To Year</label>
+                        <select name="to_year" id="to_year" class="form-select">
+                            {% for y in range(2026, 2007, -1) %}
+                                <option value="{{ y }}">{{ y }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Multiple Selection Selector -->
+            <div id="multiple-mode-input" class="form-group mode-input" style="display: none;">
+                <label class="form-label">Select Seasons</label>
+                <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.5rem; max-height: 120px; overflow-y: auto; background: var(--bg-secondary); padding: 0.75rem; border-radius: 10px; border: 1px solid var(--glass-border);">
+                    {% for y in range(2008, 2027) %}
+                        <label style="display: flex; align-items: center; gap: 0.4rem; font-size: 0.9rem; cursor: pointer;">
+                            <input type="checkbox" name="multi_years" value="{{ y }}">
+                            <span>{{ y }}</span>
+                        </label>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <!-- Trigger Scope Filter (3 types of triggers) -->
+            <div class="form-group">
+                <label class="form-label">Trigger Scope Filter</label>
+                <select name="filter_type" id="filter_type" class="form-select" onchange="toggleTriggerFilters()">
+                    <option value="season_only">Season (Year) Only</option>
+                    <option value="team">Team and Season</option>
+                    <option value="player">Player and Season</option>
+                </select>
+            </div>
+
+            <!-- Team Filter dropdown -->
+            <div id="filter-team-group" class="form-group trigger-filter" style="display: none;">
+                <label class="form-label" for="filter_team">Target Team Franchise</label>
+                <select name="filter_team" id="filter_team" class="form-select">
+                    {% for t in teams %}
+                        <option value="{{ t }}">{{ t }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <!-- Player Filter dropdown -->
+            <div id="filter-player-group" class="form-group trigger-filter" style="display: none;">
+                <label class="form-label" for="filter_player">Target Player Profile</label>
+                <select name="filter_player" id="filter_player" class="form-select">
+                    {% for p in players %}
+                        <option value="{{ p }}">{{ p }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="form-group" style="display: flex; flex-direction: column; gap: 0.5rem;">
+                <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+                    <input type="checkbox" name="reprocess" value="true">
+                    <span style="font-size: 0.9rem; font-weight: 500; color: var(--accent-orange);">
+                        <i class="fa-solid fa-rotate"></i> REPROCESS (Force reload completed seasons)
+                    </span>
+                </label>
+                <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer;">
+                    <input type="checkbox" name="simulate_failure" value="true">
+                    <span style="font-size: 0.9rem; font-weight: 500; color: var(--neon-red);">
+                        <i class="fa-solid fa-triangle-exclamation"></i> SIMULATE GOLD FAIL (Rollback commit test)
+                    </span>
+                </label>
+            </div>
+
+            <div style="display: flex; gap: 1rem; margin-top: 0.5rem;">
+                <button type="button" class="btn btn-secondary" onclick="checkSeasonsStatus()">
+                    <i class="fa-solid fa-magnifying-glass"></i> Check Data
+                </button>
+                <button type="submit" class="btn btn-primary" style="flex: 1;">
+                    <i class="fa-solid fa-play"></i> Start Pipeline
+                </button>
+            </div>
+        </form>
+    </div>
+
+    <!-- Active Seasons DB Status grid -->
+    <div class="panel">
+        <h3 style="margin-bottom: 1rem;"><i class="fa-solid fa-table-list" style="color: var(--primary-purple); margin-right: 8px;"></i> Catalog Status Registry</h3>
+        <div style="max-height: 320px; overflow-y: auto; border-radius: 10px; border: 1px solid var(--glass-border);">
+            <table style="width: 100%; border-collapse: collapse; text-align: left; font-size: 0.85rem;">
+                <thead>
+                    <tr style="background-color: var(--bg-secondary); border-bottom: 1px solid var(--glass-border); color: var(--text-secondary); text-transform: uppercase; font-size: 0.75rem; letter-spacing: 0.5px;">
+                        <th style="padding: 0.75rem;">Season</th>
+                        <th style="padding: 0.75rem;">Staging</th>
+                        <th style="padding: 0.75rem;">Validation</th>
+                        <th style="padding: 0.75rem;">Silver</th>
+                        <th style="padding: 0.75rem;">Gold</th>
+                        <th style="padding: 0.75rem;">Status</th>
+                    </tr>
+                </thead>
+                <tbody id="seasons-status-body">
+                    <tr>
+                        <td colspan="6" style="padding: 1.5rem; text-align: center; color: var(--text-tertiary);">
+                            Click "Check Data" or run a pipeline to query current statuses.
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Data Engineering Test Bench and Backfill -->
+<div class="panel" style="margin-top: 1.5rem; display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; align-items: flex-start;">
+    <!-- DE Concept Test Bench -->
+    <div>
+        <h3 style="margin-bottom: 0.75rem; color: var(--neon-red);"><i class="fa-solid fa-flask" style="margin-right: 8px;"></i> DE Concept Test Bench</h3>
+        <p style="color: var(--text-secondary); font-size: 0.85rem; margin-bottom: 1.25rem; line-height: 1.4;">
+            Test resilience mechanisms, cascading database constraints, and transactional rollbacks.
+        </p>
+        
+        <div style="display: flex; flex-direction: column; gap: 1rem;">
+            <!-- Delete Season Form -->
+            <div style="background: rgba(255, 56, 96, 0.02); border: 1px solid rgba(255, 56, 96, 0.1); padding: 1rem; border-radius: 10px;">
+                <h4 style="color: var(--neon-red); margin-bottom: 0.5rem; font-size: 0.9rem;"><i class="fa-solid fa-trash-can"></i> Data Deletion & Reset</h4>
+                <p style="font-size: 0.8rem; color: var(--text-secondary); margin-bottom: 0.75rem;">
+                    Delete single season data (relational cascade) or clear all data to start completely fresh.
+                </p>
+                <div style="display: flex; flex-direction: column; gap: 0.75rem;">
+                    <div style="display: flex; gap: 0.5rem;">
+                        <select id="delete_season_select" class="form-select" style="max-width: 150px; font-size: 0.85rem;">
+                            {% for y in range(2026, 2007, -1) %}
+                                <option value="{{ y }}">{{ y }}</option>
+                            {% endfor %}
+                        </select>
+                        <button type="button" class="btn btn-secondary" style="background: var(--neon-red); border-color: var(--neon-red); color: white; font-size: 0.85rem;" onclick="confirmDeleteSeason()">
+                            Delete Season
+                        </button>
+                    </div>
+                    <button type="button" class="btn btn-secondary" style="background: linear-gradient(to right, #e11d48, #be123c); border: none; color: white; font-size: 0.85rem; padding: 0.5rem; border-radius: 6px;" onclick="confirmResetPlatform()">
+                        <i class="fa-solid fa-triangle-exclamation"></i> Reset Entire Platform (Wipe All Data)
+                    </button>
+                </div>
+            </div>
+
+            <!-- Transaction Rollback Test Info -->
+            <div style="background: rgba(0, 242, 254, 0.02); border: 1px solid rgba(0, 242, 254, 0.1); padding: 1rem; border-radius: 10px;">
+                <h4 style="color: var(--primary-cyan); margin-bottom: 0.5rem; font-size: 0.9rem;"><i class="fa-solid fa-shield-halved"></i> Rollback Verification</h4>
+                <p style="font-size: 0.8rem; color: var(--text-secondary); line-height: 1.4;">
+                    To test <strong>Atomicity</strong> (rollback commit): Select a year, check <em>SIMULATE GOLD FAIL</em>, and run the pipeline. The database transaction will abort and run a SQL <code>ROLLBACK</code>, leaving Silver and Gold database tables completely clean of that year's data!
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Historical Backfill & Replay Console -->
+    <div>
+        <h3 style="margin-bottom: 0.75rem; color: var(--accent-orange);"><i class="fa-solid fa-clock-rotate-left" style="margin-right: 8px;"></i> Historical Backfill</h3>
+        <p style="color: var(--text-secondary); font-size: 0.85rem; margin-bottom: 1.25rem; line-height: 1.4;">
+            Rerun multiple seasons sequentially with an audited execution reason.
+        </p>
+
+        <!-- Backfill Form -->
+        <div style="background: rgba(255, 179, 0, 0.02); border: 1px solid rgba(255, 179, 0, 0.1); padding: 1rem; border-radius: 10px;">
+            <form action="{{ url_for('pipeline.trigger') }}" method="POST" style="display: flex; flex-direction: column; gap: 0.75rem;">
+                <input type="hidden" name="mode" value="range">
+                <input type="hidden" name="reprocess" value="true">
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem;">
+                    <div>
+                        <label class="form-label" style="font-size: 0.8rem;">From Year</label>
+                        <select name="from_year" class="form-select" style="font-size: 0.85rem; padding: 0.35rem;">
+                            {% for y in range(2008, 2027) %}
+                                <option value="{{ y }}">{{ y }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div>
+                        <label class="form-label" style="font-size: 0.8rem;">To Year</label>
+                        <select name="to_year" class="form-select" style="font-size: 0.85rem; padding: 0.35rem;">
+                            {% for y in range(2026, 2007, -1) %}
+                                <option value="{{ y }}">{{ y }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                </div>
+                <div>
+                    <label class="form-label" style="font-size: 0.8rem;">Audit execution reason</label>
+                    <input type="text" name="backfill_reason" placeholder="e.g. Schema mapping fix, recalculating dims" class="form-select" style="font-size: 0.85rem; padding: 0.35rem; background: var(--bg-primary);" required>
+                </div>
+                <button type="submit" class="btn btn-primary" style="padding: 0.5rem; font-size: 0.85rem; background: linear-gradient(to right, var(--accent-orange), var(--accent-orange)); border-color: var(--accent-orange);">
+                    <i class="fa-solid fa-arrows-spin"></i> Trigger Historical Backfill Run
+                </button>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- Historical Logs Table -->
+<div class="panel" style="margin-top: 1.5rem;">
+    <h3 style="margin-bottom: 1rem;"><i class="fa-solid fa-clock-rotate-left" style="color: var(--accent-orange); margin-right: 8px;"></i> Historical Executions (Last 50 Runs)</h3>
+    <div style="overflow-x: auto; border: 1px solid var(--glass-border); border-radius: 10px;">
+        <table style="width: 100%; border-collapse: collapse; text-align: left; font-size: 0.85rem;">
+            <thead>
+                <tr style="background-color: var(--bg-secondary); border-bottom: 1px solid var(--glass-border); color: var(--text-secondary);">
+                    <th style="padding: 0.75rem;">Run ID</th>
+                    <th style="padding: 0.75rem;">Season</th>
+                    <th style="padding: 0.75rem;">Failed Stage</th>
+                    <th style="padding: 0.75rem;">Duration</th>
+                    <th style="padding: 0.75rem;">Loaded Count</th>
+                    <th style="padding: 0.75rem;">Outcome</th>
+                    <th style="padding: 0.75rem;">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% if history_logs %}
+                    {% for log in history_logs %}
+                        <tr style="border-bottom: 1px solid var(--glass-border); background-color: rgba(255, 255, 255, 0.01);">
+                            <td style="padding: 0.75rem; font-family: monospace; color: var(--text-secondary);">{{ log.run_id[:8] }}...</td>
+                            <td style="padding: 0.75rem; font-weight: 600;">{{ log.season }}</td>
+                            <td style="padding: 0.75rem; text-transform: uppercase;">{{ log.stage }}</td>
+                            <td style="padding: 0.75rem;">
+                                {% if log.end_time %}
+                                    {{ ((log.end_time - log.start_time).total_seconds() | int) }}s
+                                {% else %}
+                                    -
+                                {% endif %}
+                            </td>
+                            <td style="padding: 0.75rem;">{{ log.records_inserted or 0 }}</td>
+                            <td style="padding: 0.75rem; font-weight: 700; color: {% if log.status == 'SUCCESS' %}var(--neon-green){% else %}var(--neon-red){% endif %};">
+                                {{ log.status }}
+                            </td>
+                            <td style="padding: 0.75rem;">
+                                {% if log.status == 'FAILED' %}
+                                    <form action="{{ url_for('pipeline.trigger') }}" method="POST" style="display:inline;">
+                                        <input type="hidden" name="mode" value="single">
+                                        <input type="hidden" name="single_year" value="{{ log.season }}">
+                                        <input type="hidden" name="reprocess" value="true">
+                                        <input type="hidden" name="replay_stage" value="{{ log.stage }}">
+                                        <button type="submit" class="btn btn-secondary" style="padding: 0.25rem 0.5rem; font-size: 0.75rem; background: var(--accent-orange); border-color: var(--accent-orange); color: white;">
+                                            <i class="fa-solid fa-arrow-rotate-right"></i> Replay {{ log.stage | upper }}
+                                        </button>
+                                    </form>
+                                {% else %}
+                                    <a href="{{ url_for('pipeline.monitor', run_id=log.run_id) }}" class="btn btn-secondary" style="padding: 0.25rem 0.5rem; font-size: 0.75rem;">
+                                        <i class="fa-solid fa-eye"></i> Details
+                                    </a>
+                                {% endif %}
+                            </td>
+                        </tr>
+                    {% endfor %}
+                {% else %}
+                    <tr>
+                        <td colspan="7" style="padding: 1.5rem; text-align: center; color: var(--text-tertiary);">No execution history found in database.</td>
+                    </tr>
+                {% endif %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    function toggleModeInputs(mode) {
+        document.querySelectorAll('.mode-input').forEach(el => el.style.display = 'none');
+        document.getElementById(mode + '-mode-input').style.display = 'flex';
+    }
+
+    function toggleTriggerFilters() {
+        const type = document.getElementById('filter_type').value;
+        document.querySelectorAll('.trigger-filter').forEach(el => el.style.display = 'none');
+        if (type === 'team') {
+            document.getElementById('filter-team-group').style.display = 'flex';
+        } else if (type === 'player') {
+            document.getElementById('filter-player-group').style.display = 'flex';
+        }
+    }
+
+    function checkSeasonsStatus() {
+        const body = document.getElementById('seasons-status-body');
+        body.innerHTML = `
+            <tr>
+                <td colspan="6" style="padding: 1.5rem; text-align: center; color: var(--text-secondary);">
+                    <i class="fa-solid fa-spinner fa-spin"></i> Querying Database Catalog...
+                </td>
+            </tr>
+        `;
+
+        fetch('/api/pipeline/check-seasons')
+            .then(res => res.json())
+            .then(data => {
+                if (!data || data.length === 0) {
+                    body.innerHTML = `
+                        <tr>
+                            <td colspan="6" style="padding: 1.5rem; text-align: center; color: var(--text-tertiary);">
+                                No registered seasons found. Run a pipeline to register statuses.
+                            </td>
+                        </tr>
+                    `;
+                    return;
+                }
+
+                body.innerHTML = '';
+                data.forEach(row => {
+                    const statusColor = row.status === 'COMPLETED' ? 'var(--neon-green)' : (row.status === 'FAILED' ? 'var(--neon-red)' : 'var(--accent-orange)');
+                    
+                    const tr = document.createElement('tr');
+                    tr.style.borderBottom = '1px solid var(--glass-border)';
+                    tr.innerHTML = `
+                        <td style="padding: 0.75rem; font-weight: 700;">${row.season}</td>
+                        <td style="padding: 0.75rem;"><span style="color: ${row.staging_status === 'SUCCESS' ? 'var(--neon-green)' : 'var(--text-tertiary)'}">${row.staging_status || 'PENDING'}</span></td>
+                        <td style="padding: 0.75rem;"><span style="color: ${row.validation_status === 'SUCCESS' ? 'var(--neon-green)' : 'var(--text-tertiary)'}">${row.validation_status || 'PENDING'}</span></td>
+                        <td style="padding: 0.75rem;"><span style="color: ${row.silver_status === 'SUCCESS' ? 'var(--neon-green)' : 'var(--text-tertiary)'}">${row.silver_status || 'PENDING'}</span></td>
+                        <td style="padding: 0.75rem;"><span style="color: ${row.gold_status === 'SUCCESS' ? 'var(--neon-green)' : 'var(--text-tertiary)'}">${row.gold_status || 'PENDING'}</span></td>
+                        <td style="padding: 0.75rem; font-weight: 700; color: ${statusColor}">${row.status || 'NOT PROCESSED'}</td>
+                    `;
+                    body.appendChild(tr);
+                });
+            })
+            .catch(err => {
+                console.error(err);
+                body.innerHTML = `
+                    <tr>
+                        <td colspan="6" style="padding: 1.5rem; text-align: center; color: var(--neon-red);">
+                            Error loading status details. Ensure PostgreSQL is connected.
+                        </td>
+                    </tr>
+                `;
+            });
+    }
+
+    // Auto run checks on page load
+    document.addEventListener("DOMContentLoaded", function() {
+        checkSeasonsStatus();
+    });
+
+    function confirmDeleteSeason() {
+        const season = document.getElementById('delete_season_select').value;
+        if (confirm(`ARE YOU SURE you want to delete all staged files and database records (Silver & Gold cascading) for Season ${season}?`)) {
+            const form = document.createElement('form');
+            form.method = 'POST';
+            form.action = `/pipeline/delete/${season}`;
+            document.body.appendChild(form);
+            form.submit();
+        }
+    }
+
+    function confirmResetPlatform() {
+        if (confirm("WARNING: This will drop and recreate all database tables (wiping all Silver/Gold data, logs, and CDC entries) and purge all staging/quarantine files. ARE YOU SURE?")) {
+            const form = document.createElement('form');
+            form.method = 'POST';
+            form.action = '/pipeline/reset';
+            document.body.appendChild(form);
+            form.submit();
+        }
+    }
+</script>
+{% endblock %}

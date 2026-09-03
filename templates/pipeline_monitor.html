@@ -1,0 +1,209 @@
+{% extends "base.html" %}
+
+{% block title %}Monitoring - IPL Data Platform{% endblock %}
+{% block header_title %}Pipeline Live Monitor{% endblock %}
+
+{% block content %}
+<div style="display: grid; grid-template-columns: 1fr 1.5fr; gap: 1.5rem; align-items: flex-start;">
+    <!-- Pipeline Progress Step Indicators -->
+    <div class="panel">
+        <h3 style="margin-bottom: 1rem;"><i class="fa-solid fa-spinner fa-spin" id="monitor-icon"></i> Run Progress</h3>
+        
+        <div style="margin-bottom: 1.5rem;">
+            <div style="display: flex; justify-content: space-between; font-size: 0.9rem; margin-bottom: 0.25rem;">
+                <span style="color: var(--text-secondary); font-weight: 500;">Overall Progress</span>
+                <span id="progress-text" style="font-weight: 700; color: var(--primary-cyan);">0%</span>
+            </div>
+            <!-- Progress Bar -->
+            <div style="background-color: var(--bg-secondary); height: 8px; border-radius: 4px; overflow: hidden; border: 1px solid var(--glass-border);">
+                <div id="progress-bar" style="width: 0%; height: 100%; background: linear-gradient(to right, var(--primary-cyan), var(--primary-purple)); transition: width 0.3s ease;"></div>
+            </div>
+        </div>
+
+        <div class="process-list">
+            <div class="process-step">
+                <div class="step-info">
+                    <div id="bullet-bronze" class="step-bullet"></div>
+                    <span>Bronze Ingestion Check</span>
+                </div>
+                <span id="status-bronze" style="font-size: 0.8rem; color: var(--text-secondary);">PENDING</span>
+            </div>
+            
+            <div class="process-step">
+                <div class="step-info">
+                    <div id="bullet-staging" class="step-bullet"></div>
+                    <span>Season Staging Extract</span>
+                </div>
+                <span id="status-staging" style="font-size: 0.8rem; color: var(--text-secondary);">PENDING</span>
+            </div>
+            
+            <div class="process-step">
+                <div class="step-info">
+                    <div id="bullet-validation" class="step-bullet"></div>
+                    <span>Data Validation & Quarantine</span>
+                </div>
+                <span id="status-validation" style="font-size: 0.8rem; color: var(--text-secondary);">PENDING</span>
+            </div>
+            
+            <div class="process-step">
+                <div class="step-info">
+                    <div id="bullet-silver" class="step-bullet"></div>
+                    <span>Silver Relational Import</span>
+                </div>
+                <span id="status-silver" style="font-size: 0.8rem; color: var(--text-secondary);">PENDING</span>
+            </div>
+            
+            <div class="process-step">
+                <div class="step-info">
+                    <div id="bullet-gold" class="step-bullet"></div>
+                    <span>Gold Stars Summary serving</span>
+                </div>
+                <span id="status-gold" style="font-size: 0.8rem; color: var(--text-secondary);">PENDING</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Live Execution Metrics -->
+    <div style="display: flex; flex-direction: column; gap: 1.5rem;">
+        <div class="panel" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; text-align: center;">
+            <div>
+                <div class="kpi-title" style="font-size: 0.75rem;">Current Season</div>
+                <div id="metric-season" class="kpi-value" style="font-size: 1.5rem; margin-top: 0.25rem;">-</div>
+            </div>
+            <div>
+                <div class="kpi-title" style="font-size: 0.75rem;">Processed Records</div>
+                <div id="metric-records" class="kpi-value" style="font-size: 1.5rem; margin-top: 0.25rem;">0</div>
+            </div>
+            <div>
+                <div class="kpi-title" style="font-size: 0.75rem;">Elapsed Duration</div>
+                <div id="metric-duration" class="kpi-value" style="font-size: 1.5rem; margin-top: 0.25rem;">00:00</div>
+            </div>
+        </div>
+
+        <!-- System Output console logs -->
+        <div class="panel">
+            <h3 style="margin-bottom: 0.75rem;"><i class="fa-solid fa-terminal" style="color: var(--neon-green); margin-right: 8px;"></i> Execution Log Console</h3>
+            <div id="console-logs" class="log-console">
+                [SYSTEM] Ready. Starting thread polling...
+            </div>
+            <div style="margin-top: 1rem; display: flex; justify-content: flex-end; gap: 0.75rem;">
+                <a href="{{ url_for('pipeline.index') }}" class="btn btn-secondary" style="font-size: 0.85rem; padding: 0.5rem 1rem;">
+                    <i class="fa-solid fa-chevron-left"></i> Back to Pipelines
+                </a>
+                <a href="{{ url_for('analytics.index') }}" id="btn-dashboard" class="btn btn-primary" style="display: none; font-size: 0.85rem; padding: 0.5rem 1rem;">
+                     View Analytics <i class="fa-solid fa-chevron-right"></i>
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    const runId = "{{ run_id }}";
+    const consoleLogs = document.getElementById('console-logs');
+    let lastLogLength = 0;
+
+    function pollPipelineStatus() {
+        fetch(`/api/pipeline/status/${runId}`)
+            .then(res => res.json())
+            .then(data => {
+                // Update Progress bar
+                document.getElementById('progress-bar').style.width = data.progress + '%';
+                document.getElementById('progress-text').innerText = data.progress + '%';
+                
+                // Update KPIs
+                document.getElementById('metric-season').innerText = data.current_season || '-';
+                document.getElementById('metric-records').innerText = data.records_processed.toLocaleString();
+                document.getElementById('metric-duration').innerText = data.elapsed_time || '00:00';
+                
+                // Update Logs console
+                if (data.logs && data.logs.length > lastLogLength) {
+                    for (let i = lastLogLength; i < data.logs.length; i++) {
+                        const line = document.createElement('div');
+                        line.innerText = data.logs[i];
+                        consoleLogs.appendChild(line);
+                    }
+                    lastLogLength = data.logs.length;
+                    consoleLogs.scrollTop = consoleLogs.scrollHeight;
+                }
+
+                // Update individual Bullet Statuses
+                updateBulletState('bronze', data.stage, data.status);
+                updateBulletState('staging', data.stage, data.status);
+                updateBulletState('validation', data.stage, data.status);
+                updateBulletState('silver', data.stage, data.status);
+                updateBulletState('gold', data.stage, data.status);
+
+                // Stop polling conditions
+                if (data.status === 'success') {
+                    document.getElementById('monitor-icon').className = 'fa-solid fa-circle-check';
+                    document.getElementById('monitor-icon').style.color = 'var(--neon-green)';
+                    document.getElementById('btn-dashboard').style.display = 'inline-flex';
+                    
+                    const line = document.createElement('div');
+                    line.innerText = "[SYSTEM] Execution completed successfully!";
+                    line.style.color = "var(--neon-green)";
+                    consoleLogs.appendChild(line);
+                    consoleLogs.scrollTop = consoleLogs.scrollHeight;
+                } else if (data.status === 'failed') {
+                    document.getElementById('monitor-icon').className = 'fa-solid fa-circle-exclamation';
+                    document.getElementById('monitor-icon').style.color = 'var(--neon-red)';
+                    
+                    const line = document.createElement('div');
+                    line.innerText = "[SYSTEM] Execution failed. Pipeline rolled back to preserve database consistency.";
+                    line.style.color = "var(--neon-red)";
+                    consoleLogs.appendChild(line);
+                    consoleLogs.scrollTop = consoleLogs.scrollHeight;
+                } else {
+                    // Continue polling every 1.5 seconds
+                    setTimeout(pollPipelineStatus, 1500);
+                }
+            })
+            .catch(err => {
+                console.error("Polling error:", err);
+                // retry after 3 seconds
+                setTimeout(pollPipelineStatus, 3000);
+            });
+    }
+
+    function updateBulletState(stepName, activeStage, currentStatus) {
+        const bullet = document.getElementById(`bullet-${stepName}`);
+        const statusSpan = document.getElementById(`status-${stepName}`);
+        
+        const stageOrder = ['bronze', 'staging', 'validation', 'silver', 'gold', 'done'];
+        const activeIdx = stageOrder.indexOf(activeStage);
+        const stepIdx = stageOrder.indexOf(stepName);
+
+        if (activeStage === 'done' && currentStatus === 'success') {
+            bullet.className = 'step-bullet completed';
+            statusSpan.innerText = 'SUCCESS';
+            statusSpan.style.color = 'var(--neon-green)';
+        } else if (currentStatus === 'failed' && activeStage === stepName) {
+            bullet.className = 'step-bullet failed';
+            statusSpan.innerText = 'FAILED';
+            statusSpan.style.color = 'var(--neon-red)';
+        } else if (stepIdx < activeIdx) {
+            bullet.className = 'step-bullet completed';
+            statusSpan.innerText = 'SUCCESS';
+            statusSpan.style.color = 'var(--neon-green)';
+        } else if (stepIdx === activeIdx) {
+            if (currentStatus === 'running') {
+                bullet.className = 'step-bullet active';
+                statusSpan.innerText = 'RUNNING';
+                statusSpan.style.color = 'var(--primary-cyan)';
+            }
+        } else {
+            bullet.className = 'step-bullet';
+            statusSpan.innerText = 'PENDING';
+            statusSpan.style.color = 'var(--text-secondary)';
+        }
+    }
+
+    // Trigger initial poll
+    document.addEventListener("DOMContentLoaded", function() {
+        pollPipelineStatus();
+    });
+</script>
+{% endblock %}

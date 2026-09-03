@@ -1,0 +1,58 @@
+# ==============================================================================
+# Git Ignore Configuration - End to End Cricket Data Engineering
+# ==============================================================================
+
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Text files, reports, and documentation drafts
+*.txt
+!requirements.txt
+*.docx
+*.pdf
+*.pbix
+*.zip
+*.tar.gz
+*.csv.gz
+
+# Airflow runtime & PID files
+airflow-webserver.pid
+airflow-worker.pid
+airflow-scheduler.pid
+*.pid
+airflow.db
+
+# Logs & Mock queues
+logs/
+*.log
+
+# Data directory (Ignore raw JSON/Parquet match dumps, keep directory structure)
+data/bronze/*
+!data/bronze/.gitkeep
+data/staging/*
+!data/staging/.gitkeep
+data/silver/*
+!data/silver/.gitkeep
+data/gold/*
+!data/gold/.gitkeep
+data/quarantine/*
+!data/quarantine/.gitkeep
+
+# Environments & Virtual Environments
+.env
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# IDE & OS files
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+Desktop.ini

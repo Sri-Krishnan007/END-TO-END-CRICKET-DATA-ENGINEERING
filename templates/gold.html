@@ -1,0 +1,217 @@
+{% extends "base.html" %}
+
+{% block title %}Gold Layer - IPL Data Platform{% endblock %}
+{% block header_title %}Gold Layer Star Schema (OLAP){% endblock %}
+
+{% block content %}
+<div class="panel">
+    <h3 style="margin-bottom: 0.5rem;"><i class="fa-solid fa-gem" style="color: var(--accent-orange); margin-right: 8px;"></i> Star Schema Serving Layer Inspection</h3>
+    <p style="color: var(--text-secondary); font-size: 0.95rem;">
+        The Gold Layer represents our serving database modeled as fact and dimension tables optimized for DirectQuery dashboarding and analytics.
+    </p>
+</div>
+
+<div style="display: grid; grid-template-columns: 1.5fr 1fr; gap: 1.5rem;">
+    <!-- Star Schema Model structure -->
+    <div class="panel">
+        <h4 style="margin-bottom: 1rem;"><i class="fa-solid fa-diagram-project"></i> Relational Model Layout</h4>
+        
+        <div style="background-color: var(--bg-secondary); padding: 1.25rem; border-radius: 12px; border: 1px solid var(--glass-border); line-height: 1.8; font-family: monospace; font-size: 0.9rem;">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <span style="color: var(--accent-orange); font-weight: 700;">FACT_MATCH_SUMMARY (Central Fact Table)</span>
+                <span id="count-FACT_MATCH_SUMMARY" style="font-size: 0.8rem; color: var(--accent-orange); font-weight: 700;">0 rows</span>
+            </div>
+            <div style="color: var(--text-secondary); padding-left: 1.5rem; font-size: 0.8rem;">
+                - match_id (PK)<br>
+                - season<br>
+                - team1, team2<br>
+                - winner<br>
+                - total_runs, total_wickets, total_boundaries, total_sixes
+            </div>
+            
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 0.75rem;">
+                <span style="color: var(--primary-cyan); font-weight: 700;">DIM_TEAM (Dimension)</span>
+                <span id="count-DIM_TEAM" style="font-size: 0.8rem; color: var(--primary-cyan); font-weight: 700;">0 rows</span>
+            </div>
+            <div style="color: var(--text-secondary); padding-left: 1.5rem; font-size: 0.8rem;">
+                - team_name (PK)<br>
+                - matches_played, wins, total_runs, total_boundaries, total_sixes
+            </div>
+            
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 0.75rem;">
+                <span style="color: var(--primary-cyan); font-weight: 700;">DIM_PLAYER (Dimension)</span>
+                <span id="count-DIM_PLAYER" style="font-size: 0.8rem; color: var(--primary-cyan); font-weight: 700;">0 rows</span>
+            </div>
+            <div style="color: var(--text-secondary); padding-left: 1.5rem; font-size: 0.8rem;">
+                - player_name (PK)<br>
+                - batting_runs, balls, fours, sixes, 50s, 100s<br>
+                - wickets, balls_bowled, economy, runs_conceded
+            </div>
+        </div>
+    </div>
+    
+    <div class="panel" style="display:flex; flex-direction:column; gap:1.25rem;">
+        <h4>Serving Integration</h4>
+        <p style="color: var(--text-secondary); font-size: 0.9rem;">
+            These Gold tables are updated automatically at the final stage of every successful season pipeline commit.
+        </p>
+        <div style="background-color: rgba(255, 179, 0, 0.05); border: 1px solid rgba(255, 179, 0, 0.1); border-radius: 10px; padding: 1rem; font-size: 0.85rem; color: var(--accent-orange);">
+            <i class="fa-solid fa-circle-exclamation" style="margin-right: 5px;"></i> Power BI DirectQuery can be established directly pointing to these tables in your local PostgreSQL schema.
+        </div>
+    </div>
+</div>
+
+<!-- Database inspector console -->
+<div class="panel" style="margin-top: 1.5rem;">
+    <h3 style="margin-bottom: 1rem;"><i class="fa-solid fa-database" style="color: var(--accent-orange); margin-right: 8px;"></i> Live OLAP serving Layer Inspector</h3>
+    
+    <div style="display: flex; gap: 1rem; align-items: flex-end; flex-wrap: wrap; margin-bottom: 1.5rem;">
+        <div class="form-group" style="min-width: 240px;">
+            <label class="form-label" for="inspect-table-select">Select Table</label>
+            <select id="inspect-table-select" class="form-select">
+                <option value="FACT_MATCH_SUMMARY">FACT_MATCH_SUMMARY</option>
+                <option value="DIM_TEAM">DIM_TEAM</option>
+                <option value="DIM_PLAYER">DIM_PLAYER</option>
+            </select>
+        </div>
+        <div class="form-group" style="min-width: 120px;">
+            <label class="form-label" for="inspect-season-select">Season Filter (Optional)</label>
+            <select id="inspect-season-select" class="form-select">
+                <option value="">All Seasons</option>
+                {% for y in range(2026, 2007, -1) %}
+                    <option value="{{ y }}">{{ y }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <button class="btn btn-primary" onclick="inspectDatabaseTable()">
+            <i class="fa-solid fa-magnifying-glass"></i> Inspect Table
+        </button>
+    </div>
+
+    <!-- Inspector Results -->
+    <div id="inspector-results" style="display: none;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
+            <h4 id="inspector-title" style="color: var(--accent-orange); margin: 0;">Table Name</h4>
+            <span id="inspector-count" style="font-family: monospace; font-size: 0.9rem; background: var(--bg-secondary); padding: 0.25rem 0.5rem; border-radius: 4px; border: 1px solid var(--glass-border);">0 rows total</span>
+        </div>
+        
+        <div style="overflow-x: auto; max-height: 400px; border: 1px solid var(--glass-border); border-radius: 10px;">
+            <table style="width: 100%; border-collapse: collapse; text-align: left; font-size: 0.8rem;">
+                <thead id="inspector-thead" style="background: var(--bg-secondary); border-bottom: 1px solid var(--glass-border); position: sticky; top: 0; z-index: 10;">
+                    <!-- Populated dynamically -->
+                </thead>
+                <tbody id="inspector-tbody">
+                    <!-- Populated dynamically -->
+                </tbody>
+            </table>
+        </div>
+    </div>
+    
+    <div id="inspector-empty" style="text-align: center; padding: 2rem; color: var(--text-tertiary);">
+        <i class="fa-solid fa-table" style="font-size: 2.5rem; margin-bottom: 0.5rem;"></i>
+        <p>Choose a table and click "Inspect Table" to view live PostgreSQL rows.</p>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    function loadTableStats() {
+        fetch('/api/database/stats')
+            .then(res => res.json())
+            .then(stats => {
+                const tables = ['FACT_MATCH_SUMMARY', 'DIM_TEAM', 'DIM_PLAYER'];
+                tables.forEach(t => {
+                    const el = document.getElementById(`count-${t}`);
+                    if (el && stats[t] !== undefined) {
+                        el.innerText = `${stats[t].toLocaleString()} rows`;
+                    }
+                });
+            });
+    }
+
+    function inspectDatabaseTable() {
+        const table = document.getElementById('inspect-table-select').value;
+        const season = document.getElementById('inspect-season-select').value;
+        const thead = document.getElementById('inspector-thead');
+        const tbody = document.getElementById('inspector-tbody');
+        const title = document.getElementById('inspector-title');
+        const countSpan = document.getElementById('inspector-count');
+        const resultsDiv = document.getElementById('inspector-results');
+        const emptyDiv = document.getElementById('inspector-empty');
+        
+        thead.innerHTML = '';
+        tbody.innerHTML = '';
+        
+        // Fetch stats to get count first
+        fetch('/api/database/stats')
+            .then(res => res.json())
+            .then(stats => {
+                const count = stats[table] || 0;
+                countSpan.innerText = `${count.toLocaleString()} rows total in database`;
+            });
+            
+        // Fetch sample rows
+        fetch('/api/database/sample', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ table: table, season: season })
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data.status === 'error') {
+                alert("Inspection error: " + data.message);
+                return;
+            }
+            
+            title.innerText = `Table: ${table} (First 10 sample rows shown)`;
+            resultsDiv.style.display = 'block';
+            emptyDiv.style.display = 'none';
+            
+            if (!data.columns || data.columns.length === 0) {
+                thead.innerHTML = `<tr><th style="padding:0.75rem;">No columns found</th></tr>`;
+                tbody.innerHTML = `<tr><td style="padding:1rem; text-align:center; color:var(--text-tertiary);">Table contains 0 rows for the selected filters.</td></tr>`;
+                return;
+            }
+            
+            // Render columns
+            const trHead = document.createElement('tr');
+            data.columns.forEach(col => {
+                const th = document.createElement('th');
+                th.style.padding = '0.5rem 0.75rem';
+                th.style.color = 'var(--text-secondary)';
+                th.innerText = col;
+                trHead.appendChild(th);
+            });
+            thead.appendChild(trHead);
+            
+            // Render rows
+            data.rows.forEach(row => {
+                const tr = document.createElement('tr');
+                tr.style.borderBottom = '1px solid var(--glass-border)';
+                tr.style.backgroundColor = 'rgba(255,255,255,0.01)';
+                data.columns.forEach(col => {
+                    const td = document.createElement('td');
+                    td.style.padding = '0.5rem 0.75rem';
+                    td.style.color = 'var(--text-primary)';
+                    td.style.whiteSpace = 'nowrap';
+                    td.style.overflow = 'hidden';
+                    td.style.textOverflow = 'ellipsis';
+                    td.style.maxWidth = '200px';
+                    
+                    const val = row[col];
+                    td.innerText = val !== null ? val : 'NULL';
+                    tr.appendChild(td);
+                });
+                tbody.appendChild(tr);
+            });
+        });
+    }
+
+    document.addEventListener("DOMContentLoaded", function() {
+        loadTableStats();
+        // Periodically refresh counts
+        setInterval(loadTableStats, 10000);
+    });
+</script>
+{% endblock %}

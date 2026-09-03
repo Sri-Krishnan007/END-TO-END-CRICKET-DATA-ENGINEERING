@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+
+{% block title %}Error - IPL Data Platform{% endblock %}
+{% block header_title %}System Alert / Error{% endblock %}
+
+{% block content %}
+<div class="panel" style="text-align: center; padding: 4rem 2rem; border-color: rgba(255, 56, 96, 0.2);">
+    <i class="fa-solid fa-triangle-exclamation" style="font-size: 4rem; color: var(--neon-red); margin-bottom: 1.5rem;"></i>
+    <h2 style="margin-bottom: 0.5rem;">An Unexpected System Error Occurred</h2>
+    <p style="color: var(--text-secondary); max-width: 500px; margin: 0 auto 2rem;">
+        The database transaction was aborted or a routing path was invalid. Please review the details below.
+    </p>
+
+    <div style="background-color: var(--bg-secondary); border: 1px solid var(--glass-border); padding: 1.25rem; border-radius: 10px; font-family: monospace; font-size: 0.9rem; text-align: left; max-width: 600px; margin: 0 auto 2rem; color: var(--text-primary); word-break: break-all;">
+        {{ error_message or "Unknown exception. Verify PostgreSQL database server is active and accessible." }}
+    </div>
+
+    <div style="display: flex; justify-content: center; gap: 1rem;">
+        <a href="{{ url_for('home.index') }}" class="btn btn-primary">
+            <i class="fa-solid fa-house"></i> Return Home
+        </a>
+        <a href="{{ url_for('pipeline.index') }}" class="btn btn-secondary">
+            <i class="fa-solid fa-gears"></i> View Pipelines
+        </a>
+    </div>
+</div>
+{% endblock %}

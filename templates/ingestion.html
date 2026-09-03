@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+
+{% block title %}Ingestion - IPL Data Platform{% endblock %}
+{% block header_title %}Bronze Source Ingestion{% endblock %}
+
+{% block content %}
+<div class="panel">
+    <h3 style="margin-bottom: 1rem;">One-Time Data Ingestion Console</h3>
+    <p style="color: var(--text-secondary); margin-bottom: 1.5rem;">
+        Before processing matches, the raw Cricsheet ZIP archive must be downloaded locally and registered in the database metadata catalog.
+    </p>
+
+    <div style="display: flex; gap: 2rem; align-items: flex-start; margin-bottom: 1.5rem; flex-wrap: wrap;">
+        <!-- Status Indicator Card -->
+        <div style="flex: 1; min-width: 250px; background-color: var(--bg-secondary); border: 1px solid var(--glass-border); padding: 1.5rem; border-radius: 12px;">
+            <h4 style="margin-bottom: 1rem;">Source Dataset Status</h4>
+            
+            {% if is_available %}
+                <div style="display: flex; align-items: center; gap: 0.75rem; color: var(--neon-green); font-size: 1.25rem; font-weight: 700; margin-bottom: 0.5rem;">
+                    <i class="fa-solid fa-cloud-arrow-down"></i>
+                    <span>AVAILABLE (Bronze Layer)</span>
+                </div>
+                <p style="color: var(--text-secondary); font-size: 0.9rem;">
+                    The source ZIP file is present locally. Subsequent downloads will be skipped automatically to maintain idempotency.
+                </p>
+            {% else %}
+                <div style="display: flex; align-items: center; gap: 0.75rem; color: var(--neon-red); font-size: 1.25rem; font-weight: 700; margin-bottom: 0.5rem;">
+                    <i class="fa-solid fa-cloud-arrow-down"></i>
+                    <span>MISSING / NOT DOWNLOADED</span>
+                </div>
+                <p style="color: var(--text-secondary); font-size: 0.9rem; margin-bottom: 1rem;">
+                    The dataset has not been downloaded yet. Click the button below to fetch the 1,200+ IPL match JSON files.
+                </p>
+                <form action="{{ url_for('ingestion.trigger') }}" method="POST">
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fa-solid fa-download"></i> Start Ingestion Download
+                    </button>
+                </form>
+            {% endif %}
+        </div>
+
+        <!-- Ingestion Logs Details -->
+        {% if is_available and metadata %}
+        <div style="flex: 1.5; min-width: 300px; background-color: var(--bg-secondary); border: 1px solid var(--glass-border); padding: 1.5rem; border-radius: 12px;">
+            <h4 style="margin-bottom: 1rem;">Catalog Metadata Registry</h4>
+            <table style="width: 100%; border-collapse: collapse; font-size: 0.9rem;">
+                <tr style="border-bottom: 1px solid var(--glass-border);">
+                    <td style="padding: 0.75rem 0; color: var(--text-secondary); font-weight: 600; width: 35%;">Local Directory Path:</td>
+                    <td style="padding: 0.75rem 0; font-family: monospace; color: var(--text-primary); word-break: break-all;">{{ metadata.local_path }}</td>
+                </tr>
+                <tr style="border-bottom: 1px solid var(--glass-border);">
+                    <td style="padding: 0.75rem 0; color: var(--text-secondary); font-weight: 600;">Dataset SHA-256:</td>
+                    <td style="padding: 0.75rem 0; font-family: monospace; color: var(--text-primary);">{{ metadata.file_hash[:24] }}...</td>
+                </tr>
+                <tr style="border-bottom: 1px solid var(--glass-border);">
+                    <td style="padding: 0.75rem 0; color: var(--text-secondary); font-weight: 600;">File Size (Bytes):</td>
+                    <td style="padding: 0.75rem 0; color: var(--text-primary);">{{ "{:,}".format(metadata.file_size) }} Bytes</td>
+                </tr>
+                <tr style="border-bottom: 1px solid var(--glass-border);">
+                    <td style="padding: 0.75rem 0; color: var(--text-secondary); font-weight: 600;">Registered Timestamp:</td>
+                    <td style="padding: 0.75rem 0; color: var(--text-primary);">{{ metadata.downloaded_at.strftime('%Y-%m-%d %H:%M:%S') }}</td>
+                </tr>
+                <tr>
+                    <td style="padding: 0.75rem 0; color: var(--text-secondary); font-weight: 600;">Ingestion Status:</td>
+                    <td style="padding: 0.75rem 0; color: var(--neon-green); font-weight: 700;">{{ metadata.status }}</td>
+                </tr>
+            </table>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

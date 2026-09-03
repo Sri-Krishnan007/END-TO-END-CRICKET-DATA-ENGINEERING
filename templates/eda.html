@@ -1,0 +1,392 @@
+{% extends "base.html" %}
+
+{% block title %}EDA - IPL Data Platform{% endblock %}
+{% block header_title %}Season Exploratory Data Analysis (EDA){% endblock %}
+
+{% block content %}
+<div class="panel">
+    <h3 style="margin-bottom: 0.5rem;"><i class="fa-solid fa-chart-pie" style="color: var(--primary-cyan); margin-right: 8px;"></i> Staging EDA Inspect Tool</h3>
+    <p style="color: var(--text-secondary); margin-bottom: 1rem;">
+        View exploratory metrics calculated on valid staged match data before relational Silver import.
+    </p>
+</div>
+
+<!-- Select Season for EDA -->
+<div class="panel">
+    <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 1rem;">
+        <div>
+            <h4 style="margin-bottom: 0.25rem;">Select Season Year to Review</h4>
+            <p style="color: var(--text-secondary); font-size: 0.85rem;">Only seasons successfully staged and validated can display EDA.</p>
+        </div>
+        <div style="display: flex; gap: 0.75rem; align-items: center;">
+            <select id="eda_season" class="form-select" style="min-width: 140px;">
+                {% for y in range(2026, 2007, -1) %}
+                    <option value="{{ y }}">{{ y }}</option>
+                {% endfor %}
+            </select>
+            <button class="btn btn-primary" onclick="loadSeasonEDA()">
+                <i class="fa-solid fa-arrows-rotate"></i> Load EDA
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- KPI Cards -->
+<div class="kpi-grid" id="eda-kpi-grid" style="display: none;">
+    <div class="kpi-card">
+        <div class="kpi-title">Matches</div>
+        <div id="eda-matches" class="kpi-value">0</div>
+    </div>
+    <div class="kpi-card">
+        <div class="kpi-title">Deliveries</div>
+        <div id="eda-deliveries" class="kpi-value">0</div>
+    </div>
+    <div class="kpi-card">
+        <div class="kpi-title">Runs</div>
+        <div id="eda-runs" class="kpi-value">0</div>
+    </div>
+    <div class="kpi-card">
+        <div class="kpi-title">Wickets</div>
+        <div id="eda-wickets" class="kpi-value">0</div>
+    </div>
+</div>
+
+<!-- Charts layout grids -->
+<div class="panel" id="eda-charts-panel" style="display: none; margin-top: 1.5rem;">
+    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem;">
+        <!-- Runs by Team Bar chart -->
+        <div class="panel" style="background: var(--bg-secondary); border: 1px solid var(--glass-border);">
+            <h4 style="margin-bottom: 1rem; color: var(--primary-cyan);"><i class="fa-solid fa-chart-simple"></i> Runs by Team</h4>
+            <div class="chart-container" style="height: 250px; position: relative;">
+                <canvas id="eda-chart-team-runs"></canvas>
+            </div>
+        </div>
+        
+        <!-- Top Batters horizontal bar chart -->
+        <div class="panel" style="background: var(--bg-secondary); border: 1px solid var(--glass-border);">
+            <h4 style="margin-bottom: 1rem; color: var(--accent-orange);"><i class="fa-solid fa-baseball-bat-ball"></i> Top 10 Batters</h4>
+            <div class="chart-container" style="height: 250px; position: relative;">
+                <canvas id="eda-chart-batters"></canvas>
+            </div>
+        </div>
+
+        <!-- Top Bowlers vertical bar chart -->
+        <div class="panel" style="background: var(--bg-secondary); border: 1px solid var(--glass-border);">
+            <h4 style="margin-bottom: 1rem; color: var(--neon-green);"><i class="fa-solid fa-shield-halved"></i> Top 10 Bowlers</h4>
+            <div class="chart-container" style="height: 250px; position: relative;">
+                <canvas id="eda-chart-bowlers"></canvas>
+            </div>
+        </div>
+
+        <!-- Venue distribution bar chart -->
+        <div class="panel" style="background: var(--bg-secondary); border: 1px solid var(--glass-border);">
+            <h4 style="margin-bottom: 1rem; color: var(--primary-purple);"><i class="fa-solid fa-map-pin"></i> Match Distribution by Venue</h4>
+            <div class="chart-container" style="height: 250px; position: relative;">
+                <canvas id="eda-chart-venue"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.5rem; margin-top: 1.5rem;">
+        <!-- Boundary Distribution Doughnut -->
+        <div class="panel" style="background: var(--bg-secondary); border: 1px solid var(--glass-border);">
+            <h5 style="margin-bottom: 0.75rem; text-align: center; color: var(--text-secondary);">Boundary Run Share</h5>
+            <div style="height: 180px; position: relative;">
+                <canvas id="eda-chart-boundary-share"></canvas>
+            </div>
+        </div>
+
+        <!-- Six Distribution Doughnut -->
+        <div class="panel" style="background: var(--bg-secondary); border: 1px solid var(--glass-border);">
+            <h5 style="margin-bottom: 0.75rem; text-align: center; color: var(--text-secondary);">Sixes vs Other Runs</h5>
+            <div style="height: 180px; position: relative;">
+                <canvas id="eda-chart-sixes-share"></canvas>
+            </div>
+        </div>
+
+        <!-- Dot Ball Share Doughnut -->
+        <div class="panel" style="background: var(--bg-secondary); border: 1px solid var(--glass-border);">
+            <h5 style="margin-bottom: 0.75rem; text-align: center; color: var(--text-secondary);">Dot Ball Share</h5>
+            <div style="height: 180px; position: relative;">
+                <canvas id="eda-chart-dot-share"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <!-- Team Performance Wins vs Matches -->
+    <div class="panel" style="background: var(--bg-secondary); border: 1px solid var(--glass-border); margin-top: 1.5rem;">
+        <h4 style="margin-bottom: 1rem; color: var(--primary-cyan);"><i class="fa-solid fa-trophy"></i> Team Performance (Wins vs Matches Played)</h4>
+        <div class="chart-container" style="height: 300px; position: relative;">
+            <canvas id="eda-chart-wins-losses"></canvas>
+        </div>
+    </div>
+</div>
+
+<div class="panel" id="eda-no-data" style="text-align: center; padding: 3rem; color: var(--text-tertiary);">
+    <i class="fa-solid fa-chart-line" style="font-size: 3rem; margin-bottom: 1rem; color: var(--glass-border);"></i>
+    <h4>No Season Loaded</h4>
+    <p style="font-size: 0.9rem; margin-top: 0.25rem;">Select an active season and click "Load EDA" to retrieve metrics.</p>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    let chartTeamRuns = null;
+    let chartBatters = null;
+    let chartBowlers = null;
+    let chartVenue = null;
+    let chartBoundary = null;
+    let chartSixes = null;
+    let chartDot = null;
+    let chartWins = null;
+
+    function destroyCharts() {
+        if (chartTeamRuns) chartTeamRuns.destroy();
+        if (chartBatters) chartBatters.destroy();
+        if (chartBowlers) chartBowlers.destroy();
+        if (chartVenue) chartVenue.destroy();
+        if (chartBoundary) chartBoundary.destroy();
+        if (chartSixes) chartSixes.destroy();
+        if (chartDot) chartDot.destroy();
+        if (chartWins) chartWins.destroy();
+    }
+
+    function loadSeasonEDA() {
+        const season = document.getElementById('eda_season').value;
+        const bodyNoData = document.getElementById('eda-no-data');
+        const kpiGrid = document.getElementById('eda-kpi-grid');
+        const chartsPanel = document.getElementById('eda-charts-panel');
+        
+        bodyNoData.innerHTML = `
+            <i class="fa-solid fa-spinner fa-spin" style="font-size: 3rem; margin-bottom: 1rem; color: var(--primary-cyan);"></i>
+            <h4>Analyzing Staging Area...</h4>
+            <p style="font-size: 0.9rem; margin-top: 0.25rem;">Parsing staged files for season ${season}. This operates directly on raw files.</p>
+        `;
+        bodyNoData.style.display = 'block';
+        kpiGrid.style.display = 'none';
+        chartsPanel.style.display = 'none';
+
+        fetch(`/api/eda/data/${season}`)
+        .then(res => res.json())
+        .then(data => {
+            if (data.status === 'error') {
+                bodyNoData.innerHTML = `
+                    <i class="fa-solid fa-circle-exclamation" style="font-size: 3rem; margin-bottom: 1rem; color: var(--neon-red);"></i>
+                    <h4>Data Not Available</h4>
+                    <p style="font-size: 0.9rem; margin-top: 0.25rem;">${data.message}</p>
+                `;
+                return;
+            }
+
+            bodyNoData.style.display = 'none';
+            kpiGrid.style.display = 'grid';
+            chartsPanel.style.display = 'block';
+
+            document.getElementById('eda-matches').innerText = data.kpi.matches.toLocaleString();
+            document.getElementById('eda-deliveries').innerText = data.kpi.deliveries.toLocaleString();
+            document.getElementById('eda-runs').innerText = data.kpi.runs.toLocaleString();
+            document.getElementById('eda-wickets').innerText = data.kpi.wickets.toLocaleString();
+
+            destroyCharts();
+
+            // 1. Runs by Team
+            chartTeamRuns = new Chart(document.getElementById('eda-chart-team-runs').getContext('2d'), {
+                type: 'bar',
+                data: {
+                    labels: data.charts.runs_by_team.labels,
+                    datasets: [{
+                        label: 'Total Runs',
+                        data: data.charts.runs_by_team.data,
+                        backgroundColor: 'rgba(0, 242, 254, 0.6)',
+                        borderColor: '#00f2fe',
+                        borderWidth: 1,
+                        borderRadius: 4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        x: { ticks: { color: '#9ca3af', font: { size: 8 } }, grid: { display: false } },
+                        y: { ticks: { color: '#9ca3af' }, grid: { color: 'rgba(255, 255, 255, 0.05)' } }
+                    }
+                }
+            });
+
+            // 2. Top Batters
+            chartBatters = new Chart(document.getElementById('eda-chart-batters').getContext('2d'), {
+                type: 'bar',
+                data: {
+                    labels: data.charts.top_batters.labels,
+                    datasets: [{
+                        label: 'Runs',
+                        data: data.charts.top_batters.data,
+                        backgroundColor: 'rgba(255, 179, 0, 0.6)',
+                        borderColor: '#ffb300',
+                        borderWidth: 1,
+                        borderRadius: 4
+                    }]
+                },
+                options: {
+                    indexAxis: 'y',
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        x: { ticks: { color: '#9ca3af' }, grid: { color: 'rgba(255, 255, 255, 0.05)' } },
+                        y: { ticks: { color: '#9ca3af', font: { size: 9 } }, grid: { display: false } }
+                    }
+                }
+            });
+
+            // 3. Top Bowlers
+            chartBowlers = new Chart(document.getElementById('eda-chart-bowlers').getContext('2d'), {
+                type: 'bar',
+                data: {
+                    labels: data.charts.top_bowlers.labels,
+                    datasets: [{
+                        label: 'Wickets',
+                        data: data.charts.top_bowlers.data,
+                        backgroundColor: 'rgba(57, 255, 20, 0.6)',
+                        borderColor: '#39ff14',
+                        borderWidth: 1,
+                        borderRadius: 4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        x: { ticks: { color: '#9ca3af', font: { size: 8 } }, grid: { display: false } },
+                        y: { ticks: { color: '#9ca3af' }, grid: { color: 'rgba(255, 255, 255, 0.05)' } }
+                    }
+                }
+            });
+
+            // 4. Venue Matches
+            chartVenue = new Chart(document.getElementById('eda-chart-venue').getContext('2d'), {
+                type: 'bar',
+                data: {
+                    labels: data.charts.venue_matches.labels.map(l => l.length > 22 ? l.substring(0, 20) + '...' : l),
+                    datasets: [{
+                        label: 'Matches',
+                        data: data.charts.venue_matches.data,
+                        backgroundColor: 'rgba(186, 85, 211, 0.6)',
+                        borderColor: '#ba55d3',
+                        borderWidth: 1,
+                        borderRadius: 4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        x: { ticks: { color: '#9ca3af', font: { size: 7 } }, grid: { display: false } },
+                        y: { ticks: { color: '#9ca3af' }, grid: { color: 'rgba(255, 255, 255, 0.05)' } }
+                    }
+                }
+            });
+
+            // 5. Boundary share
+            chartBoundary = new Chart(document.getElementById('eda-chart-boundary-share').getContext('2d'), {
+                type: 'pie',
+                data: {
+                    labels: data.charts.boundary_dist.labels,
+                    datasets: [{
+                        data: data.charts.boundary_dist.data,
+                        backgroundColor: ['#39ff14', '#ffb300', 'rgba(255,255,255,0.06)'],
+                        borderWidth: 0
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { position: 'bottom', labels: { color: '#9ca3af', font: { size: 8 } } } }
+                }
+            });
+
+            // 6. Sixes share
+            chartSixes = new Chart(document.getElementById('eda-chart-sixes-share').getContext('2d'), {
+                type: 'doughnut',
+                data: {
+                    labels: data.charts.six_dist.labels,
+                    datasets: [{
+                        data: data.charts.six_dist.data,
+                        backgroundColor: ['#ffb300', 'rgba(255,255,255,0.06)'],
+                        borderWidth: 0
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { position: 'bottom', labels: { color: '#9ca3af', font: { size: 8 } } } }
+                }
+            });
+
+            // 7. Dot balls share
+            chartDot = new Chart(document.getElementById('eda-chart-dot-share').getContext('2d'), {
+                type: 'doughnut',
+                data: {
+                    labels: data.charts.dot_ball_pct.labels,
+                    datasets: [{
+                        data: data.charts.dot_ball_pct.data,
+                        backgroundColor: ['#00f2fe', 'rgba(255,255,255,0.06)'],
+                        borderWidth: 0
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { position: 'bottom', labels: { color: '#9ca3af', font: { size: 8 } } } }
+                }
+            });
+
+            // 8. Wins vs Losses
+            chartWins = new Chart(document.getElementById('eda-chart-wins-losses').getContext('2d'), {
+                type: 'bar',
+                data: {
+                    labels: data.charts.team_performance.labels,
+                    datasets: [
+                        {
+                            label: 'Matches Played',
+                            data: data.charts.team_performance.matches,
+                            backgroundColor: 'rgba(255, 255, 255, 0.08)',
+                            borderColor: 'rgba(255, 255, 255, 0.2)',
+                            borderWidth: 1,
+                            borderRadius: 4
+                        },
+                        {
+                            label: 'Wins',
+                            data: data.charts.team_performance.wins,
+                            backgroundColor: 'rgba(57, 255, 20, 0.6)',
+                            borderColor: '#39ff14',
+                            borderWidth: 1,
+                            borderRadius: 4
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { labels: { color: '#9ca3af' } } },
+                    scales: {
+                        x: { ticks: { color: '#9ca3af', font: { size: 8 } }, grid: { display: false } },
+                        y: { ticks: { color: '#9ca3af' }, grid: { color: 'rgba(255, 255, 255, 0.05)' } }
+                    }
+                }
+            });
+        })
+        .catch(err => {
+            console.error(err);
+            bodyNoData.innerHTML = `
+                <i class="fa-solid fa-circle-exclamation" style="font-size: 3rem; margin-bottom: 1rem; color: var(--neon-red);"></i>
+                <h4>Connection Error</h4>
+                <p style="font-size: 0.9rem; margin-top: 0.25rem;">Failed to fetch exploratory data analysis from backend API.</p>
+            `;
+        });
+    }
+</script>
+{% endblock %}

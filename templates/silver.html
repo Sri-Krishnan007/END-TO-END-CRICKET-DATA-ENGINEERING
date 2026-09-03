@@ -1,0 +1,212 @@
+{% extends "base.html" %}
+
+{% block title %}Silver Layer - IPL Data Platform{% endblock %}
+{% block header_title %}Silver Layer Schema Catalog (OLTP){% endblock %}
+
+{% block content %}
+<div class="panel">
+    <h3 style="margin-bottom: 0.5rem;"><i class="fa-solid fa-server" style="color: var(--primary-cyan); margin-right: 8px;"></i> Normalized Relational Database Inspection</h3>
+    <p style="color: var(--text-secondary); font-size: 0.95rem;">
+        The Silver Layer contains the transaction-oriented relational tables mapping the parsed nested match details.
+    </p>
+</div>
+
+<!-- Silver Tables Schemas Grid -->
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1.5rem;">
+    <div class="panel">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
+            <h4 style="color: var(--primary-cyan); margin: 0;"><i class="fa-solid fa-table"></i> match</h4>
+            <span id="count-match" style="font-family: monospace; font-size: 0.8rem; color: var(--primary-cyan); font-weight: 700;">0 rows</span>
+        </div>
+        <p style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 0.5rem;">
+            Core table detailing match types, cities, dates, teams, outcomes, scheduled overs, and toss results.
+        </p>
+        <span style="font-family: monospace; font-size: 0.75rem; color: var(--text-tertiary);">Columns: match_id (PK), tournament, match_number, season, match_date, city, venue, team1, team2, winner...</span>
+    </div>
+    
+    <div class="panel">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
+            <h4 style="color: var(--primary-cyan); margin: 0;"><i class="fa-solid fa-table"></i> delivery</h4>
+            <span id="count-delivery" style="font-family: monospace; font-size: 0.8rem; color: var(--primary-cyan); font-weight: 700;">0 rows</span>
+        </div>
+        <p style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 0.5rem;">
+            Ball-by-ball details including batters, bowlers, runs scored, extras, legbyes, wides, and noballs.
+        </p>
+        <span style="font-family: monospace; font-size: 0.75rem; color: var(--text-tertiary);">Columns: delivery_id (PK), match_id (FK), innings_number, batting_team, over_number, batter, bowler, batter_runs, extras, total_runs...</span>
+    </div>
+    
+    <div class="panel">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
+            <h4 style="color: var(--primary-cyan); margin: 0;"><i class="fa-solid fa-table"></i> team_squad</h4>
+            <span id="count-team_squad" style="font-family: monospace; font-size: 0.8rem; color: var(--primary-cyan); font-weight: 700;">0 rows</span>
+        </div>
+        <p style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 0.5rem;">
+            Tracks squad players for teams active in each match.
+        </p>
+        <span style="font-family: monospace; font-size: 0.75rem; color: var(--text-tertiary);">Columns: team_squad_id (PK), match_id (FK), team_name, player_name</span>
+    </div>
+</div>
+
+<!-- Database inspector console -->
+<div class="panel" style="margin-top: 1.5rem;">
+    <h3 style="margin-bottom: 1rem;"><i class="fa-solid fa-database" style="color: var(--primary-cyan); margin-right: 8px;"></i> Live OLTP Database Inspector</h3>
+    
+    <div style="display: flex; gap: 1rem; align-items: flex-end; flex-wrap: wrap; margin-bottom: 1.5rem;">
+        <div class="form-group" style="min-width: 200px;">
+            <label class="form-label" for="inspect-table-select">Select Table</label>
+            <select id="inspect-table-select" class="form-select">
+                <option value="match">match</option>
+                <option value="team">team</option>
+                <option value="player">player</option>
+                <option value="official">official</option>
+                <option value="innings">innings</option>
+                <option value="delivery">delivery</option>
+                <option value="wicket">wicket</option>
+                <option value="team_squad">team_squad</option>
+                <option value="powerplay">powerplay</option>
+                <option value="toss">toss</option>
+                <option value="player_of_match">player_of_match</option>
+                <option value="match_official">match_official</option>
+            </select>
+        </div>
+        <div class="form-group" style="min-width: 120px;">
+            <label class="form-label" for="inspect-season-select">Season Filter (Optional)</label>
+            <select id="inspect-season-select" class="form-select">
+                <option value="">All Seasons</option>
+                {% for y in range(2026, 2007, -1) %}
+                    <option value="{{ y }}">{{ y }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <button class="btn btn-primary" onclick="inspectDatabaseTable()">
+            <i class="fa-solid fa-magnifying-glass"></i> Inspect Table
+        </button>
+    </div>
+
+    <!-- Inspector Results -->
+    <div id="inspector-results" style="display: none;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
+            <h4 id="inspector-title" style="color: var(--primary-cyan); margin: 0;">Table Name</h4>
+            <span id="inspector-count" style="font-family: monospace; font-size: 0.9rem; background: var(--bg-secondary); padding: 0.25rem 0.5rem; border-radius: 4px; border: 1px solid var(--glass-border);">0 rows total</span>
+        </div>
+        
+        <div style="overflow-x: auto; max-height: 400px; border: 1px solid var(--glass-border); border-radius: 10px;">
+            <table style="width: 100%; border-collapse: collapse; text-align: left; font-size: 0.8rem;">
+                <thead id="inspector-thead" style="background: var(--bg-secondary); border-bottom: 1px solid var(--glass-border); position: sticky; top: 0; z-index: 10;">
+                    <!-- Populated dynamically -->
+                </thead>
+                <tbody id="inspector-tbody">
+                    <!-- Populated dynamically -->
+                </tbody>
+            </table>
+        </div>
+    </div>
+    
+    <div id="inspector-empty" style="text-align: center; padding: 2rem; color: var(--text-tertiary);">
+        <i class="fa-solid fa-table" style="font-size: 2.5rem; margin-bottom: 0.5rem;"></i>
+        <p>Choose a table and click "Inspect Table" to view live PostgreSQL rows.</p>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    function loadTableStats() {
+        fetch('/api/database/stats')
+            .then(res => res.json())
+            .then(stats => {
+                const tables = ['match', 'delivery', 'team_squad'];
+                tables.forEach(t => {
+                    const el = document.getElementById(`count-${t}`);
+                    if (el && stats[t] !== undefined) {
+                        el.innerText = `${stats[t].toLocaleString()} rows`;
+                    }
+                });
+            });
+    }
+
+    function inspectDatabaseTable() {
+        const table = document.getElementById('inspect-table-select').value;
+        const season = document.getElementById('inspect-season-select').value;
+        const thead = document.getElementById('inspector-thead');
+        const tbody = document.getElementById('inspector-tbody');
+        const title = document.getElementById('inspector-title');
+        const countSpan = document.getElementById('inspector-count');
+        const resultsDiv = document.getElementById('inspector-results');
+        const emptyDiv = document.getElementById('inspector-empty');
+        
+        thead.innerHTML = '';
+        tbody.innerHTML = '';
+        
+        // Fetch stats to get count first
+        fetch('/api/database/stats')
+            .then(res => res.json())
+            .then(stats => {
+                const count = stats[table] || 0;
+                countSpan.innerText = `${count.toLocaleString()} rows total in database`;
+            });
+            
+        // Fetch sample rows
+        fetch('/api/database/sample', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ table: table, season: season })
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data.status === 'error') {
+                alert("Inspection error: " + data.message);
+                return;
+            }
+            
+            title.innerText = `Table: ${table} (First 10 sample rows shown)`;
+            resultsDiv.style.display = 'block';
+            emptyDiv.style.display = 'none';
+            
+            if (!data.columns || data.columns.length === 0) {
+                thead.innerHTML = `<tr><th style="padding:0.75rem;">No columns found</th></tr>`;
+                tbody.innerHTML = `<tr><td style="padding:1rem; text-align:center; color:var(--text-tertiary);">Table contains 0 rows for the selected filters.</td></tr>`;
+                return;
+            }
+            
+            // Render columns
+            const trHead = document.createElement('tr');
+            data.columns.forEach(col => {
+                const th = document.createElement('th');
+                th.style.padding = '0.5rem 0.75rem';
+                th.style.color = 'var(--text-secondary)';
+                th.innerText = col;
+                trHead.appendChild(th);
+            });
+            thead.appendChild(trHead);
+            
+            // Render rows
+            data.rows.forEach(row => {
+                const tr = document.createElement('tr');
+                tr.style.borderBottom = '1px solid var(--glass-border)';
+                tr.style.backgroundColor = 'rgba(255,255,255,0.01)';
+                data.columns.forEach(col => {
+                    const td = document.createElement('td');
+                    td.style.padding = '0.5rem 0.75rem';
+                    td.style.color = 'var(--text-primary)';
+                    td.style.whiteSpace = 'nowrap';
+                    td.style.overflow = 'hidden';
+                    td.style.textOverflow = 'ellipsis';
+                    td.style.maxWidth = '200px';
+                    
+                    const val = row[col];
+                    td.innerText = val !== null ? val : 'NULL';
+                    tr.appendChild(td);
+                });
+                tbody.appendChild(tr);
+            });
+        });
+    }
+
+    document.addEventListener("DOMContentLoaded", function() {
+        loadTableStats();
+        // Periodically refresh counts
+        setInterval(loadTableStats, 10000);
+    });
+</script>
+{% endblock %}

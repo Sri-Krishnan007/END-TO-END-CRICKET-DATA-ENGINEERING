@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+
+{% block title %}Home - IPL Data Platform{% endblock %}
+{% block header_title %}System Overview Dashboard{% endblock %}
+
+{% block content %}
+<!-- Welcome Glass Panel -->
+<div class="panel" style="background: linear-gradient(135deg, rgba(18, 22, 32, 0.8), rgba(79, 172, 254, 0.05)); display: flex; align-items: center; justify-content: space-between; gap: 2rem;">
+    <div style="flex: 1;">
+        <h1 style="font-size: 2rem; margin-bottom: 0.5rem; font-weight: 800;">End-to-End IPL Cricket Data Engineering</h1>
+        <p style="color: var(--text-secondary); margin-bottom: 1.5rem; font-size: 1.05rem;">
+            A local data lakehouse architecture processing ball-by-ball Cricsheet IPL matches using PostgreSQL, Pandas, and Flask.
+        </p>
+        <div style="display: flex; gap: 1rem;">
+            <a href="{{ url_for('pipeline.index') }}" class="btn btn-primary">
+                <i class="fa-solid fa-play"></i> Run Pipelines
+            </a>
+            <a href="{{ url_for('analytics.index') }}" class="btn btn-secondary">
+                <i class="fa-solid fa-chart-simple"></i> View Analytics
+            </a>
+        </div>
+    </div>
+    <div style="font-size: 5rem; color: rgba(0, 242, 254, 0.15); padding-right: 2rem;">
+        <i class="fa-solid fa-laptop-code"></i>
+    </div>
+</div>
+
+<!-- Database Current KPIs -->
+<h3 style="margin-top: 1.5rem; margin-bottom: 0.5rem;">Database Statistics</h3>
+<div class="kpi-grid">
+    <div class="kpi-card">
+        <div class="kpi-title">Matches Processed</div>
+        <div class="kpi-value">{{ stats.matches }}</div>
+        <div style="color: var(--text-tertiary); font-size: 0.8rem; margin-top: 0.25rem;">
+            <i class="fa-solid fa-baseball-bat-ball" style="color: var(--primary-cyan);"></i> Valid Relational Matches
+        </div>
+    </div>
+    <div class="kpi-card">
+        <div class="kpi-title">Active Seasons</div>
+        <div class="kpi-value">{{ stats.seasons }}</div>
+        <div style="color: var(--text-tertiary); font-size: 0.8rem; margin-top: 0.25rem;">
+            <i class="fa-solid fa-calendar-days" style="color: var(--primary-purple);"></i> Unique IPL Years
+        </div>
+    </div>
+    <div class="kpi-card">
+        <div class="kpi-title">Teams Registered</div>
+        <div class="kpi-value">{{ stats.teams }}</div>
+        <div style="color: var(--text-tertiary); font-size: 0.8rem; margin-top: 0.25rem;">
+            <i class="fa-solid fa-people-group" style="color: var(--neon-green);"></i> Franchise Squads
+        </div>
+    </div>
+    <div class="kpi-card">
+        <div class="kpi-title">Active Players</div>
+        <div class="kpi-value">{{ stats.players }}</div>
+        <div style="color: var(--text-tertiary); font-size: 0.8rem; margin-top: 0.25rem;">
+            <i class="fa-solid fa-user-tag" style="color: var(--accent-orange);"></i> Player Profile Records
+        </div>
+    </div>
+</div>
+
+<!-- Architectural Features -->
+<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin-top: 1.5rem;">
+    <div class="panel">
+        <h3 style="margin-bottom: 1rem;"><i class="fa-solid fa-shield-halved" style="color: var(--primary-cyan); margin-right: 8px;"></i> Pipeline Resilience</h3>
+        <ul style="list-style: none; display: flex; flex-direction: column; gap: 0.75rem; color: var(--text-secondary); font-size: 0.95rem;">
+            <li><i class="fa-solid fa-circle-check" style="color: var(--neon-green); margin-right: 8px;"></i> <strong>Idempotency</strong>: Rerunning seasons performs clean overwrites without duplicating.</li>
+            <li><i class="fa-solid fa-circle-check" style="color: var(--neon-green); margin-right: 8px;"></i> <strong>Atomicity</strong>: Multi-stage operations run within database transaction rollbacks.</li>
+            <li><i class="fa-solid fa-circle-check" style="color: var(--neon-green); margin-right: 8px;"></i> <strong>Quarantine Isolation</strong>: Data quality anomalies are routed to specific quarantine JSON folders.</li>
+        </ul>
+    </div>
+    
+    <div class="panel">
+        <h3 style="margin-bottom: 1rem;"><i class="fa-solid fa-layer-group" style="color: var(--primary-purple); margin-right: 8px;"></i> Lakehouse Design</h3>
+        <ul style="list-style: none; display: flex; flex-direction: column; gap: 0.75rem; color: var(--text-secondary); font-size: 0.95rem;">
+            <li><i class="fa-solid fa-database" style="color: var(--primary-purple); margin-right: 8px;"></i> <strong>Bronze Layer</strong>: Idempotent one-time Zip archive ingestion.</li>
+            <li><i class="fa-solid fa-database" style="color: var(--primary-cyan); margin-right: 8px;"></i> <strong>Silver Layer</strong>: 13 tables normalized relational model.</li>
+            <li><i class="fa-solid fa-database" style="color: var(--accent-orange); margin-right: 8px;"></i> <strong>Gold Layer</strong>: serving analytical star schema (Facts & Dimensions).</li>
+        </ul>
+    </div>
+</div>
+{% endblock %}

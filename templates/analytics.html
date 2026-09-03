@@ -1,0 +1,431 @@
+{% extends "base.html" %}
+
+{% block title %}Analytics - IPL Data Platform{% endblock %}
+{% block header_title %}IPL serving Analytics Dashboard{% endblock %}
+
+{% block content %}
+<!-- Filters glass panel -->
+<div class="panel">
+    <h3 style="margin-bottom: 1rem;"><i class="fa-solid fa-filter" style="color: var(--primary-cyan); margin-right: 8px;"></i> Interactive Query Filters</h3>
+    <form id="filter-form" onsubmit="event.preventDefault(); fetchDashboardData();" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1.25rem;">
+        
+        <!-- Season select mode -->
+        <div class="form-group">
+            <label class="form-label">Season Filter Mode</label>
+            <select id="season_mode" class="form-select" onchange="toggleSeasonFilters()">
+                <option value="all">All Seasons</option>
+                <option value="single">Single Season</option>
+                <option value="range">Season Range</option>
+            </select>
+        </div>
+
+        <!-- Single Season -->
+        <div id="single-season-group" class="form-group" style="display: none;">
+            <label class="form-label">Select Season</label>
+            <select id="single_season" class="form-select">
+                {% for s in seasons %}
+                    <option value="{{ s }}">{{ s }}</option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <!-- Season Range -->
+        <div id="range-season-group" class="form-group" style="display: none; grid-template-columns: 1fr 1fr; gap: 0.5rem;">
+            <div>
+                <label class="form-label">From</label>
+                <select id="from_season" class="form-select">
+                    {% for s in seasons | reverse %}
+                        <option value="{{ s }}">{{ s }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div>
+                <label class="form-label">To</label>
+                <select id="to_season" class="form-select">
+                    {% for s in seasons %}
+                        <option value="{{ s }}">{{ s }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+        </div>
+
+        <!-- Team selector -->
+        <div class="form-group">
+            <label class="form-label">Team Franchise</label>
+            <select id="team" class="form-select">
+                <option value="">All Teams</option>
+                {% for t in teams %}
+                    <option value="{{ t }}">{{ t }}</option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <!-- Player selector -->
+        <div class="form-group">
+            <label class="form-label">Player Name</label>
+            <select id="player" class="form-select">
+                <option value="">All Players</option>
+                {% for p in players %}
+                    <option value="{{ p }}">{{ p }}</option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <!-- Venue selector -->
+        <div class="form-group">
+            <label class="form-label">Match Venue</label>
+            <select id="venue" class="form-select">
+                <option value="">All Venues</option>
+                {% for v in venues %}
+                    <option value="{{ v }}">{{ v }}</option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div class="form-group" style="justify-content: flex-end;">
+            <button type="submit" class="btn btn-primary" style="width: 100%;">
+                <i class="fa-solid fa-chart-bar"></i> Apply Filters
+            </button>
+        </div>
+    </form>
+</div>
+
+<!-- KPI Summary Cards -->
+<div class="kpi-grid">
+    <div class="kpi-card">
+        <div class="kpi-title">Matches</div>
+        <div id="kpi-matches" class="kpi-value">0</div>
+    </div>
+    <div class="kpi-card">
+        <div class="kpi-title">Runs</div>
+        <div id="kpi-runs" class="kpi-value">0</div>
+    </div>
+    <div class="kpi-card">
+        <div class="kpi-title">Wickets</div>
+        <div id="kpi-wickets" class="kpi-value">0</div>
+    </div>
+    <div class="kpi-card">
+        <div class="kpi-title">Boundaries (4s)</div>
+        <div id="kpi-boundaries" class="kpi-value">0</div>
+    </div>
+    <div class="kpi-card">
+        <div class="kpi-title">Sixes (6s)</div>
+        <div id="kpi-sixes" class="kpi-value">0</div>
+    </div>
+    <div class="kpi-card">
+        <div class="kpi-title">Active Players</div>
+        <div id="kpi-players" class="kpi-value">0</div>
+    </div>
+</div>
+
+<!-- Charts layout grids -->
+<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin-top: 0.5rem;">
+    <!-- Runs by season Line chart -->
+    <div class="panel">
+        <h4 style="margin-bottom: 1rem;"><i class="fa-solid fa-arrow-trend-up" style="color: var(--primary-cyan); margin-right: 8px;"></i> Runs Conceded by Season</h4>
+        <div class="chart-container">
+            <canvas id="chart-runs-season"></canvas>
+        </div>
+    </div>
+    
+    <!-- Venue Distribution Bar chart -->
+    <div class="panel">
+        <h4 style="margin-bottom: 1rem;"><i class="fa-solid fa-map-pin" style="color: var(--primary-purple); margin-right: 8px;"></i> Venue Distribution (Matches played)</h4>
+        <div class="chart-container">
+            <canvas id="chart-venue"></canvas>
+        </div>
+    </div>
+
+    <!-- Top Batters horizontal bar chart -->
+    <div class="panel">
+        <h4 style="margin-bottom: 1rem;"><i class="fa-solid fa-baseball-bat-ball" style="color: var(--accent-orange); margin-right: 8px;"></i> Top 10 Batters (Total Runs)</h4>
+        <div class="chart-container">
+            <canvas id="chart-batters"></canvas>
+        </div>
+    </div>
+
+    <!-- Top Bowlers vertical bar chart -->
+    <div class="panel">
+        <h4 style="margin-bottom: 1rem;"><i class="fa-solid fa-shield-halved" style="color: var(--neon-green); margin-right: 8px;"></i> Top 10 Bowlers (Wickets)</h4>
+        <div class="chart-container">
+            <canvas id="chart-bowlers"></canvas>
+        </div>
+    </div>
+</div>
+
+<!-- Grouped Season-wise Performance Report -->
+<div class="panel" style="margin-top: 1.5rem;">
+    <h3 style="margin-bottom: 1rem;" id="report-title"><i class="fa-solid fa-table" style="color: var(--accent-orange); margin-right: 8px;"></i> Grouped Performance Report</h3>
+    <div style="overflow-x: auto; border: 1px solid var(--glass-border); border-radius: 10px;">
+        <table style="width: 100%; border-collapse: collapse; text-align: left; font-size: 0.85rem;">
+            <thead id="report-thead">
+                <!-- Dynamically populated -->
+            </thead>
+            <tbody id="report-tbody">
+                <!-- Dynamically populated -->
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Keep tracks of chart instances to destroy on re-draws
+    let chartRunsSeason = null;
+    let chartVenue = null;
+    let chartBatters = null;
+    let chartBowlers = null;
+
+    function toggleSeasonFilters() {
+        const mode = document.getElementById('season_mode').value;
+        document.getElementById('single-season-group').style.display = mode === 'single' ? 'flex' : 'none';
+        document.getElementById('range-season-group').style.display = mode === 'range' ? 'grid' : 'none';
+    }
+
+    function fetchDashboardData() {
+        const payload = {
+            season_mode: document.getElementById('season_mode').value,
+            single_season: document.getElementById('single_season').value,
+            from_season: document.getElementById('from_season').value,
+            to_season: document.getElementById('to_season').value,
+            team: document.getElementById('team').value,
+            player: document.getElementById('player').value,
+            venue: document.getElementById('venue').value
+        };
+
+        fetch('/api/analytics/query', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data.status === 'error') {
+                alert("Analytics Query Failed: " + data.message);
+                return;
+            }
+
+            // 1. Update KPI Card values
+            document.getElementById('kpi-matches').innerText = data.kpi.matches.toLocaleString();
+            document.getElementById('kpi-runs').innerText = data.kpi.runs.toLocaleString();
+            document.getElementById('kpi-wickets').innerText = data.kpi.wickets.toLocaleString();
+            document.getElementById('kpi-boundaries').innerText = data.kpi.boundaries.toLocaleString();
+            document.getElementById('kpi-sixes').innerText = data.kpi.sixes.toLocaleString();
+            document.getElementById('kpi-players').innerText = data.kpi.players.toLocaleString();
+
+            // 2. Render Runs by Season Line Chart
+            renderLineChart(
+                'chart-runs-season',
+                data.charts.runs_by_season.labels,
+                data.charts.runs_by_season.data,
+                'Total Runs Scored',
+                '#00f2fe',
+                val => chartRunsSeason = val,
+                chartRunsSeason
+            );
+
+            // 3. Render Venue Matches Bar Chart
+            renderBarChart(
+                'chart-venue',
+                data.charts.venue_matches.labels.map(l => l.length > 20 ? l.substring(0, 18) + '...' : l),
+                data.charts.venue_matches.data,
+                'Matches Played',
+                '#4facfe',
+                val => chartVenue = val,
+                chartVenue
+            );
+
+            // 4. Render Top Batters Bar Chart
+            renderBarChart(
+                'chart-batters',
+                data.charts.top_batters.labels,
+                data.charts.top_batters.data,
+                'Total Runs',
+                '#ffb300',
+                val => chartBatters = val,
+                chartBatters
+            );
+
+            // 5. Render Top Bowlers Bar Chart
+            renderBarChart(
+                'chart-bowlers',
+                data.charts.top_bowlers.labels,
+                data.charts.top_bowlers.data,
+                'Wickets Taken',
+                '#39ff14',
+                val => chartBowlers = val,
+                chartBowlers
+            );
+
+            // 6. Update Grouped Season-wise Performance Report
+            const rThead = document.getElementById('report-thead');
+            const rTbody = document.getElementById('report-tbody');
+            const rTitle = document.getElementById('report-title');
+            
+            rThead.innerHTML = '';
+            rTbody.innerHTML = '';
+            
+            if (data.reports.type === 'player') {
+                rTitle.innerHTML = `<i class="fa-solid fa-table" style="color: var(--accent-orange); margin-right: 8px;"></i> Player Season-wise Report: ${payload.player}`;
+                rThead.innerHTML = `
+                    <tr style="background-color: var(--bg-secondary); border-bottom: 1px solid var(--glass-border); color: var(--text-secondary);">
+                        <th style="padding: 0.75rem;">Season</th>
+                        <th style="padding: 0.75rem;">Batting Matches</th>
+                        <th style="padding: 0.75rem;">Runs Scored</th>
+                        <th style="padding: 0.75rem;">Balls Faced</th>
+                        <th style="padding: 0.75rem;">Strike Rate</th>
+                        <th style="padding: 0.75rem;">Bowling Matches</th>
+                        <th style="padding: 0.75rem;">Wickets Taken</th>
+                        <th style="padding: 0.75rem;">Runs Conceded</th>
+                    </tr>
+                `;
+                data.reports.rows.forEach(row => {
+                    const strikeRate = row.balls > 0 ? ((row.runs / row.balls) * 100).toFixed(1) : '0.0';
+                    const tr = document.createElement('tr');
+                    tr.style.borderBottom = '1px solid var(--glass-border)';
+                    tr.innerHTML = `
+                        <td style="padding: 0.75rem; font-weight: 700;">${row.season}</td>
+                        <td style="padding: 0.75rem;">${row.bat_matches}</td>
+                        <td style="padding: 0.75rem;">${row.runs}</td>
+                        <td style="padding: 0.75rem;">${row.balls}</td>
+                        <td style="padding: 0.75rem; font-weight: 600; color: var(--primary-cyan);">${strikeRate}%</td>
+                        <td style="padding: 0.75rem;">${row.bow_matches}</td>
+                        <td style="padding: 0.75rem; font-weight: 600; color: var(--neon-green);">${row.wickets}</td>
+                        <td style="padding: 0.75rem;">${row.conceded}</td>
+                    `;
+                    rTbody.appendChild(tr);
+                });
+            } else if (data.reports.type === 'team') {
+                rTitle.innerHTML = `<i class="fa-solid fa-table" style="color: var(--accent-orange); margin-right: 8px;"></i> Team Season-wise Report: ${payload.team}`;
+                rThead.innerHTML = `
+                    <tr style="background-color: var(--bg-secondary); border-bottom: 1px solid var(--glass-border); color: var(--text-secondary);">
+                        <th style="padding: 0.75rem;">Season</th>
+                        <th style="padding: 0.75rem;">Matches Played</th>
+                        <th style="padding: 0.75rem;">Wins</th>
+                        <th style="padding: 0.75rem;">Runs Scored</th>
+                        <th style="padding: 0.75rem;">4s Scored</th>
+                        <th style="padding: 0.75rem;">6s Scored</th>
+                    </tr>
+                `;
+                data.reports.rows.forEach(row => {
+                    const tr = document.createElement('tr');
+                    tr.style.borderBottom = '1px solid var(--glass-border)';
+                    tr.innerHTML = `
+                        <td style="padding: 0.75rem; font-weight: 700;">${row.season}</td>
+                        <td style="padding: 0.75rem;">${row.matches}</td>
+                        <td style="padding: 0.75rem; font-weight: 600; color: var(--neon-green);">${row.wins}</td>
+                        <td style="padding: 0.75rem;">${row.runs.toLocaleString()}</td>
+                        <td style="padding: 0.75rem;">${row.fours}</td>
+                        <td style="padding: 0.75rem;">${row.sixes}</td>
+                    `;
+                    rTbody.appendChild(tr);
+                });
+            } else {
+                rTitle.innerHTML = `<i class="fa-solid fa-table" style="color: var(--accent-orange); margin-right: 8px;"></i> Overall Season-wise Aggregates`;
+                rThead.innerHTML = `
+                    <tr style="background-color: var(--bg-secondary); border-bottom: 1px solid var(--glass-border); color: var(--text-secondary);">
+                        <th style="padding: 0.75rem;">Season</th>
+                        <th style="padding: 0.75rem;">Total Matches</th>
+                        <th style="padding: 0.75rem;">Total Runs Scored</th>
+                        <th style="padding: 0.75rem;">Total Wickets Fallen</th>
+                    </tr>
+                `;
+                data.reports.rows.forEach(row => {
+                    const tr = document.createElement('tr');
+                    tr.style.borderBottom = '1px solid var(--glass-border)';
+                    tr.innerHTML = `
+                        <td style="padding: 0.75rem; font-weight: 700;">${row.season}</td>
+                        <td style="padding: 0.75rem;">${row.matches}</td>
+                        <td style="padding: 0.75rem;">${row.runs.toLocaleString()}</td>
+                        <td style="padding: 0.75rem; color: var(--neon-red);">${row.wickets}</td>
+                    `;
+                    rTbody.appendChild(tr);
+                });
+            }
+        })
+        .catch(err => console.error("Failed to load dashboard data:", err));
+    }
+
+    function renderLineChart(canvasId, labels, dataPoints, labelName, strokeColor, instanceSetter, existingInstance) {
+        if (existingInstance) {
+            existingInstance.destroy();
+        }
+
+        const ctx = document.getElementById(canvasId).getContext('2d');
+        const gradient = ctx.createLinearGradient(0, 0, 0, 300);
+        gradient.addColorStop(0, strokeColor + '33');
+        gradient.addColorStop(1, strokeColor + '00');
+
+        const newChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: labels,
+                datasets: [{
+                    label: labelName,
+                    data: dataPoints,
+                    borderColor: strokeColor,
+                    backgroundColor: gradient,
+                    borderWidth: 2,
+                    fill: true,
+                    tension: 0.3,
+                    pointBackgroundColor: strokeColor
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false }
+                },
+                scales: {
+                    x: { grid: { color: 'rgba(255, 255, 255, 0.05)' }, ticks: { color: '#9ca3af' } },
+                    y: { grid: { color: 'rgba(255, 255, 255, 0.05)' }, ticks: { color: '#9ca3af' } }
+                }
+            }
+        });
+
+        instanceSetter(newChart);
+    }
+
+    function renderBarChart(canvasId, labels, dataPoints, labelName, fillColor, instanceSetter, existingInstance) {
+        if (existingInstance) {
+            existingInstance.destroy();
+        }
+
+        const ctx = document.getElementById(canvasId).getContext('2d');
+        const newChart = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: labels,
+                datasets: [{
+                    label: labelName,
+                    data: dataPoints,
+                    backgroundColor: fillColor + 'cc',
+                    borderColor: fillColor,
+                    borderWidth: 1,
+                    borderRadius: 4
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false }
+                },
+                scales: {
+                    x: { grid: { display: false }, ticks: { color: '#9ca3af', font: { size: 9 } } },
+                    y: { grid: { color: 'rgba(255, 255, 255, 0.05)' }, ticks: { color: '#9ca3af' } }
+                }
+            }
+        });
+
+        instanceSetter(newChart);
+    }
+
+    // Auto run analytics query on load
+    document.addEventListener("DOMContentLoaded", function() {
+        fetchDashboardData();
+    });
+</script>
+{% endblock %}

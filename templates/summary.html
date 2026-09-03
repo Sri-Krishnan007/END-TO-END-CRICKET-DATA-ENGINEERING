@@ -1,0 +1,305 @@
+{% extends "base.html" %}
+
+{% block title %}Data Catalog Summary - IPL Data Platform{% endblock %}
+{% block header_title %}Data Catalog & Serving Layer Summary{% endblock %}
+
+{% block content %}
+<!-- Page description -->
+<div class="panel">
+    <h3 style="margin-bottom: 0.5rem;"><i class="fa-solid fa-database" style="color: var(--primary-cyan); margin-right: 8px;"></i> Servings Layers & Data Catalog</h3>
+    <p style="color: var(--text-secondary); font-size: 0.95rem;">
+        This page displays a dynamic row-count summary and description for all 15 tables across our staging, relational Silver, and analytical Gold layers.
+    </p>
+</div>
+
+<!-- Table Catalog Summary Grid -->
+<div class="panel">
+    <h3 style="margin-bottom: 1rem;"><i class="fa-solid fa-list-check" style="color: var(--accent-orange); margin-right: 8px;"></i> Database Tables Catalog</h3>
+    <div style="overflow-x: auto; border: 1px solid var(--glass-border); border-radius: 10px;">
+        <table style="width: 100%; border-collapse: collapse; text-align: left; font-size: 0.85rem;">
+            <thead>
+                <tr style="background-color: var(--bg-secondary); border-bottom: 1px solid var(--glass-border); color: var(--text-secondary); text-transform: uppercase; font-size: 0.75rem; letter-spacing: 0.5px;">
+                    <th style="padding: 0.75rem;">Table Name</th>
+                    <th style="padding: 0.75rem;">Layer</th>
+                    <th style="padding: 0.75rem;">Keys (PK / FK)</th>
+                    <th style="padding: 0.75rem;">Description</th>
+                    <th style="padding: 0.75rem; text-align: right;">Live Rows Count</th>
+                </tr>
+            </thead>
+            <tbody>
+                <!-- 1. Metadata and Control -->
+                <tr style="border-bottom: 1px solid var(--glass-border); background: rgba(255, 255, 255, 0.01);">
+                    <td style="padding: 0.75rem; font-weight: 700; font-family: monospace;">source_registry</td>
+                    <td style="padding: 0.75rem;"><span style="color: var(--text-tertiary); font-size: 0.75rem; border: 1px solid var(--glass-border); padding: 0.1rem 0.4rem; border-radius: 4px;">Bronze Control</span></td>
+                    <td style="padding: 0.75rem; font-family: monospace; font-size: 0.75rem;">source_id (PK)</td>
+                    <td style="padding: 0.75rem; color: var(--text-secondary);">Metadata registry of ingested raw source ZIP files.</td>
+                    <td id="count-source_registry" style="padding: 0.75rem; font-family: monospace; font-weight: 700; text-align: right; color: var(--primary-cyan);">0</td>
+                </tr>
+                <tr style="border-bottom: 1px solid var(--glass-border); background: rgba(255, 255, 255, 0.01);">
+                    <td style="padding: 0.75rem; font-weight: 700; font-family: monospace;">pipeline_control</td>
+                    <td style="padding: 0.75rem;"><span style="color: var(--text-tertiary); font-size: 0.75rem; border: 1px solid var(--glass-border); padding: 0.1rem 0.4rem; border-radius: 4px;">Control</span></td>
+                    <td style="padding: 0.75rem; font-family: monospace; font-size: 0.75rem;">pipeline_id (PK), season (UQ)</td>
+                    <td style="padding: 0.75rem; color: var(--text-secondary);">Tracks completion status for bronze, staging, validation, silver, and gold.</td>
+                    <td id="count-pipeline_control" style="padding: 0.75rem; font-family: monospace; font-weight: 700; text-align: right; color: var(--primary-cyan);">0</td>
+                </tr>
+                <tr style="border-bottom: 1px solid var(--glass-border); background: rgba(255, 255, 255, 0.01);">
+                    <td style="padding: 0.75rem; font-weight: 700; font-family: monospace;">quarantine_records</td>
+                    <td style="padding: 0.75rem;"><span style="color: var(--neon-red); font-size: 0.75rem; border: 1px solid rgba(255, 56, 96, 0.2); padding: 0.1rem 0.4rem; border-radius: 4px; background: rgba(255, 56, 96, 0.02);">Quarantine</span></td>
+                    <td style="padding: 0.75rem; font-family: monospace; font-size: 0.75rem;">record_id (PK)</td>
+                    <td style="padding: 0.75rem; color: var(--text-secondary);">Logs of match records that failed validations with raw JSON dumps.</td>
+                    <td id="count-quarantine_records" style="padding: 0.75rem; font-family: monospace; font-weight: 700; text-align: right; color: var(--neon-red);">0</td>
+                </tr>
+                
+                <!-- 2. Silver OLTP -->
+                <tr style="border-bottom: 1px solid var(--glass-border); background: rgba(255, 255, 255, 0.01);">
+                    <td style="padding: 0.75rem; font-weight: 700; font-family: monospace;">match</td>
+                    <td style="padding: 0.75rem;"><span style="color: var(--primary-cyan); font-size: 0.75rem; border: 1px solid rgba(0, 242, 254, 0.2); padding: 0.1rem 0.4rem; border-radius: 4px; background: rgba(0, 242, 254, 0.02);">Silver OLTP</span></td>
+                    <td style="padding: 0.75rem; font-family: monospace; font-size: 0.75rem;">match_id (PK)</td>
+                    <td style="padding: 0.75rem; color: var(--text-secondary);">Normalized match metadata (venue, date, teams, winner, margins).</td>
+                    <td id="count-match" style="padding: 0.75rem; font-family: monospace; font-weight: 700; text-align: right; color: var(--primary-cyan);">0</td>
+                </tr>
+                <tr style="border-bottom: 1px solid var(--glass-border); background: rgba(255, 255, 255, 0.01);">
+                    <td style="padding: 0.75rem; font-weight: 700; font-family: monospace;">team</td>
+                    <td style="padding: 0.75rem;"><span style="color: var(--primary-cyan); font-size: 0.75rem; border: 1px solid rgba(0, 242, 254, 0.2); padding: 0.1rem 0.4rem; border-radius: 4px; background: rgba(0, 242, 254, 0.02);">Silver OLTP</span></td>
+                    <td style="padding: 0.75rem; font-family: monospace; font-size: 0.75rem;">team_name (PK)</td>
+                    <td style="padding: 0.75rem; color: var(--text-secondary);">Unique index of cricket franchise names in clean format.</td>
+                    <td id="count-team" style="padding: 0.75rem; font-family: monospace; font-weight: 700; text-align: right; color: var(--primary-cyan);">0</td>
+                </tr>
+                <tr style="border-bottom: 1px solid var(--glass-border); background: rgba(255, 255, 255, 0.01);">
+                    <td style="padding: 0.75rem; font-weight: 700; font-family: monospace;">player</td>
+                    <td style="padding: 0.75rem;"><span style="color: var(--primary-cyan); font-size: 0.75rem; border: 1px solid rgba(0, 242, 254, 0.2); padding: 0.1rem 0.4rem; border-radius: 4px; background: rgba(0, 242, 254, 0.02);">Silver OLTP</span></td>
+                    <td style="padding: 0.75rem; font-family: monospace; font-size: 0.75rem;">player_name (PK)</td>
+                    <td style="padding: 0.75rem; color: var(--text-secondary);">Registry of unique players with Cricsheet identifier.</td>
+                    <td id="count-player" style="padding: 0.75rem; font-family: monospace; font-weight: 700; text-align: right; color: var(--primary-cyan);">0</td>
+                </tr>
+                <tr style="border-bottom: 1px solid var(--glass-border); background: rgba(255, 255, 255, 0.01);">
+                    <td style="padding: 0.75rem; font-weight: 700; font-family: monospace;">delivery</td>
+                    <td style="padding: 0.75rem;"><span style="color: var(--primary-cyan); font-size: 0.75rem; border: 1px solid rgba(0, 242, 254, 0.2); padding: 0.1rem 0.4rem; border-radius: 4px; background: rgba(0, 242, 254, 0.02);">Silver OLTP</span></td>
+                    <td style="padding: 0.75rem; font-family: monospace; font-size: 0.75rem;">delivery_id (PK), match_id (FK)</td>
+                    <td style="padding: 0.75rem; color: var(--text-secondary);">Ball-by-ball events details (runs, extras, batter, bowler).</td>
+                    <td id="count-delivery" style="padding: 0.75rem; font-family: monospace; font-weight: 700; text-align: right; color: var(--primary-cyan);">0</td>
+                </tr>
+                <tr style="border-bottom: 1px solid var(--glass-border); background: rgba(255, 255, 255, 0.01);">
+                    <td style="padding: 0.75rem; font-weight: 700; font-family: monospace;">wicket</td>
+                    <td style="padding: 0.75rem;"><span style="color: var(--primary-cyan); font-size: 0.75rem; border: 1px solid rgba(0, 242, 254, 0.2); padding: 0.1rem 0.4rem; border-radius: 4px; background: rgba(0, 242, 254, 0.02);">Silver OLTP</span></td>
+                    <td style="padding: 0.75rem; font-family: monospace; font-size: 0.75rem;">wicket_id (PK), delivery_id (FK), match_id (FK)</td>
+                    <td style="padding: 0.75rem; color: var(--text-secondary);">Detailing dismissals (player out, bowler, kind of dismissal).</td>
+                    <td id="count-wicket" style="padding: 0.75rem; font-family: monospace; font-weight: 700; text-align: right; color: var(--primary-cyan);">0</td>
+                </tr>
+                <tr style="border-bottom: 1px solid var(--glass-border); background: rgba(255, 255, 255, 0.01);">
+                    <td style="padding: 0.75rem; font-weight: 700; font-family: monospace;">team_squad</td>
+                    <td style="padding: 0.75rem;"><span style="color: var(--primary-cyan); font-size: 0.75rem; border: 1px solid rgba(0, 242, 254, 0.2); padding: 0.1rem 0.4rem; border-radius: 4px; background: rgba(0, 242, 254, 0.02);">Silver OLTP</span></td>
+                    <td style="padding: 0.75rem; font-family: monospace; font-size: 0.75rem;">team_squad_id (PK), match_id (FK)</td>
+                    <td style="padding: 0.75rem; color: var(--text-secondary);">Maps squads of players active in each match.</td>
+                    <td id="count-team_squad" style="padding: 0.75rem; font-family: monospace; font-weight: 700; text-align: right; color: var(--primary-cyan);">0</td>
+                </tr>
+                
+                <!-- 3. Gold OLAP -->
+                <tr style="border-bottom: 1px solid var(--glass-border); background: rgba(255, 255, 255, 0.01);">
+                    <td style="padding: 0.75rem; font-weight: 700; font-family: monospace; color: var(--accent-orange);">FACT_MATCH_SUMMARY</td>
+                    <td style="padding: 0.75rem;"><span style="color: var(--accent-orange); font-size: 0.75rem; border: 1px solid rgba(255, 179, 0, 0.2); padding: 0.1rem 0.4rem; border-radius: 4px; background: rgba(255, 179, 0, 0.02);">Gold OLAP</span></td>
+                    <td style="padding: 0.75rem; font-family: monospace; font-size: 0.75rem;">match_id (PK)</td>
+                    <td style="padding: 0.75rem; color: var(--text-secondary);">Match aggregates serving facts (total runs, boundaries, sixes).</td>
+                    <td id="count-FACT_MATCH_SUMMARY" style="padding: 0.75rem; font-family: monospace; font-weight: 700; text-align: right; color: var(--accent-orange);">0</td>
+                </tr>
+                <tr style="border-bottom: 1px solid var(--glass-border); background: rgba(255, 255, 255, 0.01);">
+                    <td style="padding: 0.75rem; font-weight: 700; font-family: monospace; color: var(--accent-orange);">DIM_TEAM</td>
+                    <td style="padding: 0.75rem;"><span style="color: var(--accent-orange); font-size: 0.75rem; border: 1px solid rgba(255, 179, 0, 0.2); padding: 0.1rem 0.4rem; border-radius: 4px; background: rgba(255, 179, 0, 0.02);">Gold OLAP</span></td>
+                    <td style="padding: 0.75rem; font-family: monospace; font-size: 0.75rem;">team_name (PK)</td>
+                    <td style="padding: 0.75rem; color: var(--text-secondary);">Team career metrics (wins, boundaries, runs scored).</td>
+                    <td id="count-DIM_TEAM" style="padding: 0.75rem; font-family: monospace; font-weight: 700; text-align: right; color: var(--accent-orange);">0</td>
+                </tr>
+                <tr style="border-bottom: 1px solid var(--glass-border); background: rgba(255, 255, 255, 0.01);">
+                    <td style="padding: 0.75rem; font-weight: 700; font-family: monospace; color: var(--accent-orange);">DIM_PLAYER</td>
+                    <td style="padding: 0.75rem;"><span style="color: var(--accent-orange); font-size: 0.75rem; border: 1px solid rgba(255, 179, 0, 0.2); padding: 0.1rem 0.4rem; border-radius: 4px; background: rgba(255, 179, 0, 0.02);">Gold OLAP</span></td>
+                    <td style="padding: 0.75rem; font-family: monospace; font-size: 0.75rem;">player_name (PK)</td>
+                    <td style="padding: 0.75rem; color: var(--text-secondary);">Player career stats (batting runs, strike rate, wickets, economy).</td>
+                    <td id="count-DIM_PLAYER" style="padding: 0.75rem; font-family: monospace; font-weight: 700; text-align: right; color: var(--accent-orange);">0</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Database inspector console -->
+<div class="panel" style="margin-top: 1.5rem;">
+    <h3 style="margin-bottom: 1rem;"><i class="fa-solid fa-magnifying-glass-chart" style="color: var(--primary-cyan); margin-right: 8px;"></i> Live Serving Layer Row Inspector</h3>
+    
+    <div style="display: flex; gap: 1rem; align-items: flex-end; flex-wrap: wrap; margin-bottom: 1.5rem;">
+        <div class="form-group" style="min-width: 240px;">
+            <label class="form-label" for="inspect-table-select">Select Database Table</label>
+            <select id="inspect-table-select" class="form-select">
+                <optgroup label="Metadata & Logs">
+                    <option value="source_registry">source_registry</option>
+                    <option value="pipeline_control">pipeline_control</option>
+                    <option value="quarantine_records">quarantine_records</option>
+                    <option value="cdc_states">cdc_states</option>
+                    <option value="cdc_log">cdc_log</option>
+                    <option value="pipeline_runs">pipeline_runs</option>
+                </optgroup>
+                <optgroup label="Silver OLTP Schema">
+                    <option value="match">match</option>
+                    <option value="team">team</option>
+                    <option value="player">player</option>
+                    <option value="official">official</option>
+                    <option value="innings">innings</option>
+                    <option value="delivery">delivery</option>
+                    <option value="wicket">wicket</option>
+                    <option value="team_squad">team_squad</option>
+                    <option value="powerplay">powerplay</option>
+                    <option value="toss">toss</option>
+                    <option value="player_of_match">player_of_match</option>
+                    <option value="match_official">match_official</option>
+                </optgroup>
+                <optgroup label="Gold OLAP Mart Layer">
+                    <option value="FACT_MATCH_SUMMARY">FACT_MATCH_SUMMARY</option>
+                    <option value="DIM_TEAM">DIM_TEAM</option>
+                    <option value="DIM_PLAYER">DIM_PLAYER</option>
+                </optgroup>
+            </select>
+        </div>
+        <div class="form-group" style="min-width: 120px;">
+            <label class="form-label" for="inspect-season-select">Season Filter (Optional)</label>
+            <select id="inspect-season-select" class="form-select">
+                <option value="">All Seasons</option>
+                {% for y in range(2026, 2007, -1) %}
+                    <option value="{{ y }}">{{ y }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <button class="btn btn-primary" onclick="inspectDatabaseTable()">
+            <i class="fa-solid fa-eye"></i> Retrieve Records
+        </button>
+    </div>
+
+    <!-- Inspector Results -->
+    <div id="inspector-results" style="display: none;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
+            <h4 id="inspector-title" style="color: var(--primary-cyan); margin: 0;">Table Name</h4>
+            <span id="inspector-count" style="font-family: monospace; font-size: 0.9rem; background: var(--bg-secondary); padding: 0.25rem 0.5rem; border-radius: 4px; border: 1px solid var(--glass-border);">0 rows total</span>
+        </div>
+        
+        <div style="overflow-x: auto; max-height: 400px; border: 1px solid var(--glass-border); border-radius: 10px;">
+            <table style="width: 100%; border-collapse: collapse; text-align: left; font-size: 0.8rem;">
+                <thead id="inspector-thead" style="background: var(--bg-secondary); border-bottom: 1px solid var(--glass-border); position: sticky; top: 0; z-index: 10;">
+                    <!-- Populated dynamically -->
+                </thead>
+                <tbody id="inspector-tbody">
+                    <!-- Populated dynamically -->
+                </tbody>
+            </table>
+        </div>
+    </div>
+    
+    <div id="inspector-empty" style="text-align: center; padding: 2rem; color: var(--text-tertiary);">
+        <i class="fa-solid fa-table" style="font-size: 2.5rem; margin-bottom: 0.5rem;"></i>
+        <p>Choose a table and click "Retrieve Records" to inspect live PostgreSQL rows.</p>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    function loadTableStats() {
+        fetch('/api/database/stats')
+            .then(res => res.json())
+            .then(stats => {
+                const tables = [
+                    'source_registry', 'pipeline_control', 'quarantine_records',
+                    'match', 'team', 'player', 'delivery', 'wicket', 'team_squad',
+                    'FACT_MATCH_SUMMARY', 'DIM_TEAM', 'DIM_PLAYER'
+                ];
+                tables.forEach(t => {
+                    const el = document.getElementById(`count-${t}`);
+                    if (el && stats[t] !== undefined) {
+                        el.innerText = stats[t].toLocaleString();
+                    }
+                });
+            });
+    }
+
+    function inspectDatabaseTable() {
+        const table = document.getElementById('inspect-table-select').value;
+        const season = document.getElementById('inspect-season-select').value;
+        const thead = document.getElementById('inspector-thead');
+        const tbody = document.getElementById('inspector-tbody');
+        const title = document.getElementById('inspector-title');
+        const countSpan = document.getElementById('inspector-count');
+        const resultsDiv = document.getElementById('inspector-results');
+        const emptyDiv = document.getElementById('inspector-empty');
+        
+        thead.innerHTML = '';
+        tbody.innerHTML = '';
+        
+        // Fetch stats to get count first
+        fetch('/api/database/stats')
+            .then(res => res.json())
+            .then(stats => {
+                const count = stats[table] || 0;
+                countSpan.innerText = `${count.toLocaleString()} rows total in database`;
+            });
+            
+        // Fetch sample rows
+        fetch('/api/database/sample', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ table: table, season: season })
+        })
+        .then(res => res.json())
+        .then(data => {
+            if (data.status === 'error') {
+                alert("Inspection error: " + data.message);
+                return;
+            }
+            
+            title.innerText = `Table: ${table} (First 10 sample rows shown)`;
+            resultsDiv.style.display = 'block';
+            emptyDiv.style.display = 'none';
+            
+            if (!data.columns || data.columns.length === 0) {
+                thead.innerHTML = `<tr><th style="padding:0.75rem;">No columns found</th></tr>`;
+                tbody.innerHTML = `<tr><td style="padding:1rem; text-align:center; color:var(--text-tertiary);">Table contains 0 rows for the selected filters.</td></tr>`;
+                return;
+            }
+            
+            // Render columns
+            const trHead = document.createElement('tr');
+            data.columns.forEach(col => {
+                const th = document.createElement('th');
+                th.style.padding = '0.5rem 0.75rem';
+                th.style.color = 'var(--text-secondary)';
+                th.innerText = col;
+                trHead.appendChild(th);
+            });
+            thead.appendChild(trHead);
+            
+            // Render rows
+            data.rows.forEach(row => {
+                const tr = document.createElement('tr');
+                tr.style.borderBottom = '1px solid var(--glass-border)';
+                tr.style.backgroundColor = 'rgba(255,255,255,0.01)';
+                data.columns.forEach(col => {
+                    const td = document.createElement('td');
+                    td.style.padding = '0.5rem 0.75rem';
+                    td.style.color = 'var(--text-primary)';
+                    td.style.whiteSpace = 'nowrap';
+                    td.style.overflow = 'hidden';
+                    td.style.textOverflow = 'ellipsis';
+                    td.style.maxWidth = '200px';
+                    
+                    const val = row[col];
+                    td.innerText = val !== null ? val : 'NULL';
+                    tr.appendChild(td);
+                });
+                tbody.appendChild(tr);
+            });
+        });
+    }
+
+    document.addEventListener("DOMContentLoaded", function() {
+        loadTableStats();
+        // Periodically refresh stats
+        setInterval(loadTableStats, 10000);
+    });
+</script>
+{% endblock %}
