@@ -33,10 +33,10 @@ A production-grade, enterprise Data Engineering platform that ingests, streams, 
   - [Database Initialization](#database-initialization)
   - [Running with Docker Compose](#running-with-docker-compose)
   - [Running the Flask Monitoring Portal](#running-the-flask-monitoring-portal)
-- [Pipeline Execution](#-pipeline-execution)
-  - [Via Airflow Orchestrator](#via-airflow-orchestrator)
-  - [Via CLI / Python Runner](#via-cli--python-runner)
-  - [Via Web Dashboard](#via-web-dashboard)
+- [CI/CD & Version Control for Data](#-cicd--version-control-for-data)
+  - [Git Branching Strategy](#git-branching-strategy)
+  - [Automated GitHub Actions CI/CD](#automated-github-actions-cicd)
+  - [Data Transformation & Mock Testing](#data-transformation--mock-testing)
 - [License](#-license)
 
 ---
@@ -57,9 +57,9 @@ flowchart TD
     end
 
     subgraph Staging & Quality [Data Staging & Quarantine]
-        F -->|Write Staging JSON / Parquet| G[data/staging/{season}/]
+        F -->|Write Staging JSON / Parquet| G["data/staging/{season}/"]
         G -->|11 Data Quality Rules| H{Quality Gate}
-        H -->|Fail Quality Rule| I[data/quarantine/{season}/]
+        H -->|Fail Quality Rule| I["data/quarantine/{season}/"]
         I -->|Log Isolation Reason| J[(quarantine_records)]
         H -->|Pass Quality Gate| K[CDC Delta Detection Engine]
     end
@@ -76,15 +76,8 @@ flowchart TD
 
     subgraph Serving & UI [Monitoring & Analytics]
         R --> S[Flask Web Portal / Analytics Dashboard]
-        R --> T[Power BI / BI Reports]
-        N --> U[Airflow DAG Monitoring UI]
-    end
+        R --> T[Power BI / BI Repo]
 
-    style C fill:#f9d5e5,stroke:#333
-    style J fill:#fcc,stroke:#333
-    style N fill:#f9d5e5,stroke:#333
-    style P fill:#d4edda,stroke:#333
-    style R fill:#c3e6cb,stroke:#28a745,stroke-width:2px
 ```
 
 ---
@@ -351,11 +344,30 @@ python pipeline/pipeline_runner.py --season 2024 --reprocess
 
 ---
 
-## 🧪 Testing
+## 🔄 CI/CD & Version Control for Data
 
-Run the test suite to verify pipeline integrity:
+This project implements enterprise **DataOps** best practices for version control and automated testing:
+
+### Git Branching Strategy
+* **`main`**: Production branch containing verified Airflow DAGs, production schemas, and deployed models.
+* **`dev`**: Active integration branch where new features and staging transformations are aggregated.
+* **`feature/<name>`**: Isolated branches for developing specific tasks (e.g. `feature/gold-analytics-metrics`).
+
+```
+feature/branch ───> [Pull Request & Automated CI Tests] ───> dev ───> main (Production)
+```
+
+### Automated GitHub Actions CI/CD
+On every `git push` or `pull_request` to `main` and `dev`, the workflow [`.github/workflows/ci.yml`](.github/workflows/ci.yml) executes:
+1. **Linting & Code Quality:** Checks Python syntax via Flake8 to ensure zero undefined names or syntax errors.
+2. **PostgreSQL Schema Verification:** Boots an ephemeral PostgreSQL service container and runs DDL scripts to ensure table schemas, foreign keys, and indexes are intact.
+3. **Data Transformation Tests:** Executes deterministic tests for canonical team mappings, tournament season extraction, and SHA-256 CDC delta hashing.
+4. **Data Quality Assertion Tests:** Asserts that 11 data quality rules properly reject and isolate corrupted records.
+5. **Mock Message Queue Tests:** Validates Kafka producer and consumer streaming logic in isolation without external network dependencies.
+
+### Running Tests Locally
 ```bash
-pytest tests/
+python -m unittest discover -s tests -p "test_*.py"
 ```
 
 ---
@@ -363,3 +375,4 @@ pytest tests/
 ## 📜 License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+

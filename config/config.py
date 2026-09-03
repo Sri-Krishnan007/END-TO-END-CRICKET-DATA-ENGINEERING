@@ -16,12 +16,12 @@ LOGS_PATH = PROJECT_ROOT / "logs"
 for path in [BRONZE_PATH / "source", STAGING_PATH, SILVER_PATH, GOLD_PATH, QUARANTINE_PATH, LOGS_PATH]:
     path.mkdir(parents=True, exist_ok=True)
 
-# Database Configuration
+# Database Configuration (Supabase Cloud PostgreSQL)
 DATABASE_URL = os.environ.get(
     "DATABASE_URL", 
-    "postgresql://postgres:krish%40123@localhost:5432/postgres"
+    "postgresql://postgres.dfgjodtxiuepowmphotf:yWCKLOQ8znyxRCDD@aws-0-ap-southeast-2.pooler.supabase.com:5432/postgres"
 )
-PGPASSWORD = os.environ.get("PGPASSWORD", "krish@123")
+PGPASSWORD = os.environ.get("PGPASSWORD", "yWCKLOQ8znyxRCDD")
 
 def clean_team_name(name):
     """Maps historical/variant team names to their canonical representations."""

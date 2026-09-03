@@ -1,0 +1,60 @@
+name: Data Pipeline CI/CD
+
+on:
+  push:
+    branches: [ main, dev ]
+  pull_request:
+    branches: [ main, dev ]
+
+jobs:
+  test-and-validate:
+    name: Run Linting & Data Transformation Tests
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:13
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: password123
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+    - name: Checkout Repository
+      uses: actions/checkout@v4
+
+    - name: Set up Python 3.11
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+        cache: 'pip'
+
+    - name: Install Project Dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install flake8
+
+    - name: Code Linting & Syntax Verification
+      run: |
+        # Stop build on syntax errors or undefined names
+        flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics --exclude=logs,data,__pycache__,.venv,venv
+
+    - name: Initialize Test Database Schema
+      env:
+        DATABASE_URL: postgresql://postgres:password123@localhost:5432/postgres
+      run: |
+        python -c "from database.connection import init_db; init_db()"
+
+    - name: Run Data Pipeline Unit & Mock Tests
+      env:
+        DATABASE_URL: postgresql://postgres:password123@localhost:5432/postgres
+      run: |
+        python -m unittest discover -s tests -p "test_*.py"

@@ -40,3 +40,20 @@ def get_db_cursor(commit=True, cursor_factory=None):
     finally:
         cur.close()
         conn.close()
+
+def init_db():
+    """Initializes the database schema by executing database/schema.sql."""
+    from pathlib import Path
+    from config.config import PROJECT_ROOT
+    
+    schema_path = Path(PROJECT_ROOT) / "database" / "schema.sql"
+    if not schema_path.exists():
+        raise FileNotFoundError(f"Schema file not found at {schema_path}")
+        
+    with open(schema_path, "r", encoding="utf-8") as f:
+        schema_sql = f.read()
+        
+    with get_db_cursor(commit=True) as cur:
+        cur.execute(schema_sql)
+    print("Database schema successfully initialized in PostgreSQL/Supabase.")
+
