@@ -1,0 +1,149 @@
+{
+  "format-version": 2,
+  "table-uuid": "ipl-matches-1790082560122",
+  "location": "s3a://warehouse/ipl/ipl_matches",
+  "last-sequence-number": 1,
+  "last-updated-ms": 1790082560122,
+  "last-column-id": 19,
+  "schema": {
+    "type": "struct",
+    "schema-id": 0,
+    "fields": [
+      {
+        "id": 1,
+        "name": "match_id",
+        "required": true,
+        "type": "string"
+      },
+      {
+        "id": 2,
+        "name": "season",
+        "required": true,
+        "type": "string"
+      },
+      {
+        "id": 3,
+        "name": "match_date",
+        "required": false,
+        "type": "string"
+      },
+      {
+        "id": 4,
+        "name": "match_type",
+        "required": false,
+        "type": "string"
+      },
+      {
+        "id": 5,
+        "name": "venue",
+        "required": false,
+        "type": "string"
+      },
+      {
+        "id": 6,
+        "name": "city",
+        "required": false,
+        "type": "string"
+      },
+      {
+        "id": 7,
+        "name": "team1",
+        "required": false,
+        "type": "string"
+      },
+      {
+        "id": 8,
+        "name": "team2",
+        "required": false,
+        "type": "string"
+      },
+      {
+        "id": 9,
+        "name": "toss_winner",
+        "required": false,
+        "type": "string"
+      },
+      {
+        "id": 10,
+        "name": "toss_decision",
+        "required": false,
+        "type": "string"
+      },
+      {
+        "id": 11,
+        "name": "winner",
+        "required": false,
+        "type": "string"
+      },
+      {
+        "id": 12,
+        "name": "win_by_runs",
+        "required": false,
+        "type": "int"
+      },
+      {
+        "id": 13,
+        "name": "win_by_wickets",
+        "required": false,
+        "type": "int"
+      },
+      {
+        "id": 14,
+        "name": "player_of_match",
+        "required": false,
+        "type": "string"
+      },
+      {
+        "id": 15,
+        "name": "total_overs",
+        "required": false,
+        "type": "int"
+      },
+      {
+        "id": 16,
+        "name": "total_runs",
+        "required": false,
+        "type": "int"
+      },
+      {
+        "id": 17,
+        "name": "total_wickets",
+        "required": false,
+        "type": "int"
+      },
+      {
+        "id": 18,
+        "name": "raw_payload",
+        "required": false,
+        "type": "string"
+      },
+      {
+        "id": 19,
+        "name": "ingested_at",
+        "required": true,
+        "type": "timestamptz"
+      }
+    ]
+  },
+  "partition-spec": [
+    {
+      "name": "season",
+      "transform": "identity",
+      "source-id": 2,
+      "field-id": 1000
+    }
+  ],
+  "default-spec-id": 0,
+  "current-snapshot-id": 1790082560122,
+  "snapshots": [
+    {
+      "snapshot-id": 1790082560122,
+      "timestamp-ms": 1790082560122,
+      "summary": {
+        "operation": "append",
+        "added-data-files": "2",
+        "added-records": "2"
+      }
+    }
+  ]
+}

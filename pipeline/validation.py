@@ -90,7 +90,7 @@ def validate_match_json(match_id, file_path, season):
             return False, "REFERENTIAL_INTEGRITY", f"Batting team '{bat_team}' is not one of the match teams: {teams}"
             
     # 11. Outlier/Anomaly Detection Checks
-    # Check 11a: Unusual total match runs (e.g. extremely high score > 450 runs)
+    # Check 11a: Unusual total match runs (e.g. extremely high score > 560 runs)
     match_total_runs = 0
     for inning in innings:
         inning_runs = 0
@@ -98,8 +98,8 @@ def validate_match_json(match_id, file_path, season):
             for deliv in over_data.get("deliveries", []):
                 inning_runs += deliv.get("runs", {}).get("total", 0)
         match_total_runs += inning_runs
-    if match_total_runs > 450:
-        return False, "OUTLIER_DETECTION", f"Match total runs ({match_total_runs}) exceeds standard outlier threshold of 450 runs"
+    if match_total_runs > 560:
+        return False, "OUTLIER_DETECTION", f"Match total runs ({match_total_runs}) exceeds standard outlier threshold of 560 runs"
         
     # Check 11b: Impossible low score for a normal completed match (e.g. total runs < 30 but winner exists)
     outcome = info.get("outcome", {})

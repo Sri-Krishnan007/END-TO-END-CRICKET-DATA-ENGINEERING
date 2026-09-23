@@ -415,3 +415,108 @@ def database_sample():
             })
     except Exception as e:
         return jsonify({"status": "error", "message": str(e)}), 500
+
+
+@api_bp.route('/api/db/status', methods=['GET'])
+def get_database_status():
+    """Returns the current active database target and connection health for Online & Offline."""
+    from config.config import get_active_db_mode
+    from database.connection import test_db_connection
+    
+    active_mode = get_active_db_mode()
+    online_stat = test_db_connection("online")
+    offline_stat = test_db_connection("offline")
+    
+    return jsonify({
+        "status": "success",
+        "active_mode": active_mode,
+        "active_label": "Online (Supabase Cloud)" if active_mode == "online" else "Offline (Local PostgreSQL)",
+        "online": online_stat,
+        "offline": offline_stat
+    })
+
+
+@api_bp.route('/api/db/switch', methods=['POST'])
+def switch_database():
+    """Switches the active database target between 'online' (Supabase) and 'offline' (Local)."""
+    from config.config import set_active_db_mode, get_active_db_mode
+    from database.connection import test_db_connection
+    
+    data = request.get_json() or {}
+    target_mode = data.get("mode", "").strip().lower()
+    
+    if target_mode not in ["online", "offline", "local"]:
+        return jsonify({"status": "error", "message": "Invalid mode. Choose 'online' or 'offline'."}), 400
+        
+    normalized_mode = "offline" if target_mode in ["offline", "local"] else "online"
+    new_mode = set_active_db_mode(normalized_mode)
+    conn_result = test_db_connection(new_mode)
+    
+    return jsonify({
+        "status": "success",
+        "active_mode": new_mode,
+        "active_label": "Online (Supabase Cloud)" if new_mode == "online" else "Offline (Local PostgreSQL)",
+        "connection": conn_result,
+        "message": f"Successfully switched to {conn_result['name']}."
+    })
+
+
+@api_bp.route('/api/lakehouse/status', methods=['GET'])
+
+def get_lakehouse_status():
+    """Returns status of MinIO, Nessie Catalog, and Iceberg table metadata."""
+    import requests
+    from config.config import (
+        MINIO_ENDPOINT, NESSIE_URI, ICEBERG_CATALOG_NAME, 
+        ICEBERG_TABLE_NAME, ICEBERG_CHECKPOINT_PATH, PROJECT_ROOT
+    )
+    from pipeline.iceberg_pipeline import is_minio_reachable, verify_checkpoint_recovery
+    
+    minio_alive = is_minio_reachable()
+    nessie_alive = False
+    try:
+        r = requests.get(f"{NESSIE_URI}/config", timeout=1)
+        nessie_alive = (r.status_code == 200)
+    except Exception:
+        pass
+        
+    # Check local warehouse partitions
+    warehouse_local = PROJECT_ROOT / "data" / "warehouse" / "ipl" / "ipl_matches"
+    partitions = [p.name for p in warehouse_local.glob("season=*")] if warehouse_local.exists() else []
+    metadata_count = len(list((warehouse_local / "metadata").glob("*.json"))) if warehouse_local.exists() else 0
+    
+    chk_ok, chk_state = verify_checkpoint_recovery()
+
+    return jsonify({
+        "status": "success",
+        "minio": {
+            "endpoint": MINIO_ENDPOINT,
+            "connected": minio_alive
+        },
+        "nessie": {
+            "uri": NESSIE_URI,
+            "connected": nessie_alive
+        },
+        "iceberg": {
+            "catalog": ICEBERG_CATALOG_NAME,
+            "table": ICEBERG_TABLE_NAME,
+            "partition_key": "season",
+            "partitions": partitions,
+            "snapshots_count": metadata_count,
+            "checkpoint": chk_state
+        }
+    })
+
+
+@api_bp.route('/api/lakehouse/sync', methods=['POST'])
+def trigger_lakehouse_sync():
+    """Triggers on-demand Lakehouse Iceberg stream sync for requested seasons."""
+    from pipeline.iceberg_pipeline import run_iceberg_streaming_pipeline
+    data = request.get_json() or {}
+    seasons = data.get("seasons", [2024])
+    try:
+        res = run_iceberg_streaming_pipeline(seasons)
+        return jsonify(res)
+    except Exception as e:
+        return jsonify({"status": "error", "message": str(e)}), 500
+

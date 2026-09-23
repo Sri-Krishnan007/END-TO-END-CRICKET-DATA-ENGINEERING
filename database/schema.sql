@@ -24,6 +24,7 @@ DROP TABLE IF EXISTS quarantine_records CASCADE;
 DROP TABLE IF EXISTS cdc_states CASCADE;
 DROP TABLE IF EXISTS cdc_log CASCADE;
 DROP TABLE IF EXISTS pipeline_runs CASCADE;
+DROP TABLE IF EXISTS bpm_process_events CASCADE;
 
 -- ============================================================================
 -- 1. PIPELINE CONTROL TABLES
@@ -308,3 +309,25 @@ CREATE TABLE DIM_PLAYER (
     wickets_taken INT,
     best_wickets INT
 );
+
+-- ============================================================================
+-- 4. BPM PROCESS EVENT LOG TABLE
+-- ============================================================================
+
+CREATE TABLE bpm_process_events (
+    event_id SERIAL PRIMARY KEY,
+    case_id VARCHAR(50) NOT NULL,
+    activity VARCHAR(100) NOT NULL,
+    event_timestamp TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    end_timestamp TIMESTAMP,
+    duration_seconds NUMERIC,
+    status VARCHAR(30) NOT NULL,
+    records_processed INT DEFAULT 0,
+    error_message TEXT,
+    metadata JSONB DEFAULT '{}'::jsonb
+);
+
+CREATE INDEX idx_bpm_case_id ON bpm_process_events(case_id);
+CREATE INDEX idx_bpm_activity ON bpm_process_events(activity);
+CREATE INDEX idx_bpm_timestamp ON bpm_process_events(event_timestamp);
+

@@ -66,7 +66,7 @@ This is the main interaction console of the application.
     *   **Season Selector:** Dropdown to load staging statistics for a specific season.
     *   **Summary Stats Grid:** Displays total matches, run totals, extras, match venues, and unique teams.
     *   **Nulls & Missing Value Matrix:** Visual chart showing missing keys in raw files.
-    *   **Anomalies Alerts:** Highlights files containing outliers (e.g. match runs > 450).
+    *   **Anomalies Alerts:** Highlights files containing outliers (e.g. match runs > 560).
 *   **How to use:** Show this to demonstrate how you understand the staged raw JSON data structure before performing ETL silver transformations.
 
 ---

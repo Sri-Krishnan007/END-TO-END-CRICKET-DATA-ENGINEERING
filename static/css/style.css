@@ -352,3 +352,146 @@ h1, h2, h3 {
     height: 320px;
     width: 100%;
 }
+
+/* Database Mode Switcher Widget */
+.db-switcher-widget {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    background: rgba(18, 22, 32, 0.85);
+    border: 1px solid var(--glass-border);
+    padding: 0.4rem 0.75rem;
+    border-radius: 30px;
+    backdrop-filter: blur(10px);
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+}
+
+.db-toggle-container {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.db-toggle-label {
+    font-size: 0.8rem;
+    color: var(--text-tertiary);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.db-pill-selector {
+    display: flex;
+    background: rgba(10, 12, 16, 0.9);
+    border-radius: 20px;
+    padding: 3px;
+    border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.db-pill-btn {
+    border: none;
+    background: transparent;
+    color: var(--text-secondary);
+    padding: 0.35rem 0.85rem;
+    border-radius: 16px;
+    font-size: 0.82rem;
+    font-weight: 600;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    transition: all 0.25s ease;
+    font-family: var(--font-body);
+}
+
+.db-pill-btn:hover {
+    color: var(--text-primary);
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.db-pill-btn.active.online {
+    background: linear-gradient(135deg, #00f2fe, #4facfe);
+    color: #0a0c10;
+    font-weight: 700;
+    box-shadow: 0 0 12px rgba(0, 242, 254, 0.4);
+}
+
+.db-pill-btn.active.offline {
+    background: linear-gradient(135deg, #39ff14, #00d2ff);
+    color: #0a0c10;
+    font-weight: 700;
+    box-shadow: 0 0 12px rgba(57, 255, 20, 0.4);
+}
+
+.db-status-badge {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.78rem;
+    font-weight: 600;
+    padding: 0.3rem 0.7rem;
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.status-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background-color: var(--neon-green);
+    box-shadow: 0 0 8px var(--neon-green);
+    animation: pulse 2s infinite;
+}
+
+.status-dot.loading {
+    background-color: var(--accent-orange);
+    box-shadow: 0 0 8px var(--accent-orange);
+}
+
+.status-dot.error {
+    background-color: var(--neon-red);
+    box-shadow: 0 0 8px var(--neon-red);
+}
+
+/* Sidebar DB Info Card */
+.sidebar-db-card {
+    margin-top: auto;
+    background: rgba(10, 12, 16, 0.7);
+    border: 1px solid var(--glass-border);
+    border-radius: 12px;
+    padding: 1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.sidebar-db-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 0.75rem;
+    color: var(--text-tertiary);
+    text-transform: uppercase;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+}
+
+.sidebar-db-title {
+    font-size: 0.88rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.sidebar-db-details {
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+    font-family: 'Courier New', Courier, monospace;
+}
+

@@ -60,6 +60,14 @@
                 </div>
                 <span id="status-gold" style="font-size: 0.8rem; color: var(--text-secondary);">PENDING</span>
             </div>
+            
+            <div class="process-step">
+                <div class="step-info">
+                    <div id="bullet-lakehouse" class="step-bullet"></div>
+                    <span>Iceberg Lakehouse Sync (MinIO/Nessie)</span>
+                </div>
+                <span id="status-lakehouse" style="font-size: 0.8rem; color: var(--text-secondary);">PENDING</span>
+            </div>
         </div>
     </div>
 
@@ -135,6 +143,8 @@
                 updateBulletState('validation', data.stage, data.status);
                 updateBulletState('silver', data.stage, data.status);
                 updateBulletState('gold', data.stage, data.status);
+                updateBulletState('lakehouse', data.stage, data.status);
+
 
                 // Stop polling conditions
                 if (data.status === 'success') {
@@ -172,7 +182,7 @@
         const bullet = document.getElementById(`bullet-${stepName}`);
         const statusSpan = document.getElementById(`status-${stepName}`);
         
-        const stageOrder = ['bronze', 'staging', 'validation', 'silver', 'gold', 'done'];
+        const stageOrder = ['bronze', 'staging', 'validation', 'cdc', 'silver', 'gold', 'lakehouse', 'done'];
         const activeIdx = stageOrder.indexOf(activeStage);
         const stepIdx = stageOrder.indexOf(stepName);
 

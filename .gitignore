@@ -18,6 +18,8 @@ __pycache__/
 *.tar.gz
 *.csv.gz
 
+/DOCument and reports
+
 # Airflow runtime & PID files
 airflow-webserver.pid
 airflow-worker.pid

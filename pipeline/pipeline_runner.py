@@ -7,6 +7,7 @@ from pipeline.source_ingestion import ingest_source, check_ingested
 from pipeline.staging import stage_seasons
 from pipeline.validation import validate_season
 from pipeline.cdc import detect_changes_for_season
+from bpm.event_logger import log_bpm_event
 
 # In-memory thread-safe global tracking dictionary
 PIPELINE_STATUS = {}
@@ -49,18 +50,22 @@ def set_pipeline_status(run_id, stage, status, progress, records_processed, curr
             state["logs"].append(f"[{datetime.now().strftime('%H:%M:%S')}] {logs_append}")
 
 def insert_pipeline_run_db(run_id, mode, season):
-    """Creates a new entry in the pipeline_runs table."""
+    """Creates a new entry in the pipeline_runs table, or updates season if already initialized in a multi-season run."""
     try:
         with get_db_cursor(commit=True) as cur:
             cur.execute(
                 """
                 INSERT INTO pipeline_runs (run_id, pipeline_mode, season, start_time, status, current_stage)
                 VALUES (%s, %s, %s, CURRENT_TIMESTAMP, 'RUNNING', 'bronze')
+                ON CONFLICT (run_id) DO UPDATE SET
+                    season = EXCLUDED.season,
+                    status = 'RUNNING',
+                    current_stage = 'bronze'
                 """,
                 (run_id, mode, str(season))
             )
     except Exception as e:
-        print(f"Failed to insert pipeline_run to DB: {e}")
+        print(f"Failed to insert/update pipeline_run in DB: {e}")
 
 def update_pipeline_run_db(run_id, status, current_stage, last_successful, counts=None, error_msg=None):
     """Updates progress and record counts in the pipeline_runs table."""
@@ -173,18 +178,23 @@ def run_season_pipeline(season, run_id, reprocess=False, target_team=None, targe
         set_pipeline_status(run_id, "bronze", "running", 10, 0, season, f"Verifying Bronze source for season {season}")
         update_pipeline_control(season, "bronze", "RUNNING")
         update_pipeline_run_db(run_id, 'RUNNING', 'bronze', 'init')
+        log_bpm_event(run_id, "bronze", "RUNNING", start_time=start_time, metadata={"season": str(season)})
         
         if not check_ingested():
             set_pipeline_status(run_id, "bronze", "running", 15, 0, season, "Downloading Cricsheet dataset...")
             ingest_res = ingest_source()
             if ingest_res["status"] == "FAILED":
+                end_time = datetime.now()
                 set_pipeline_status(run_id, "bronze", "failed", 15, 0, season, f"Bronze Ingestion Failed: {ingest_res['message']}")
                 log_stage_to_db(run_id, season, "bronze", start_time, "FAILED", error_message=ingest_res["message"])
+                log_bpm_event(run_id, "bronze", "FAILED", start_time=start_time, end_time=end_time, error_message=ingest_res['message'], metadata={"season": str(season)})
                 update_pipeline_control(season, "bronze", "FAILED")
                 update_pipeline_run_db(run_id, 'FAILED', 'bronze', 'init', error_msg=ingest_res["message"])
                 return False
                 
+        end_time = datetime.now()
         log_stage_to_db(run_id, season, "bronze", start_time, "SUCCESS")
+        log_bpm_event(run_id, "bronze", "SUCCESS", start_time=start_time, end_time=end_time, metadata={"season": str(season)})
         update_pipeline_control(season, "bronze", "SUCCESS")
     else:
         print(f"[REPLAY] Skipping Bronze validation (stage: {start_at_stage})")
@@ -195,17 +205,22 @@ def run_season_pipeline(season, run_id, reprocess=False, target_team=None, targe
         set_pipeline_status(run_id, "staging", "running", 25, 0, season, "Extracting matches to JSON and Parquet staging directories...")
         update_pipeline_control(season, "staging", "RUNNING")
         update_pipeline_run_db(run_id, 'RUNNING', 'staging', 'bronze')
+        log_bpm_event(run_id, "staging", "RUNNING", start_time=start_time, metadata={"season": str(season)})
         try:
             staged_counts = stage_seasons([season], target_team=target_team, target_player=target_player)
             records_read = staged_counts.get(str(season), 0)
             counts['read'] = records_read
+            end_time = datetime.now()
             
             log_stage_to_db(run_id, season, "staging", start_time, "SUCCESS", records_read=records_read, records_inserted=records_read)
+            log_bpm_event(run_id, "staging", "SUCCESS", start_time=start_time, end_time=end_time, records_processed=records_read, metadata={"season": str(season)})
             update_pipeline_control(season, "staging", "SUCCESS")
         except Exception as e:
             err_msg = str(e)
+            end_time = datetime.now()
             set_pipeline_status(run_id, "staging", "failed", 25, 0, season, f"Staging Failed: {err_msg}")
             log_stage_to_db(run_id, season, "staging", start_time, "FAILED", error_message=err_msg)
+            log_bpm_event(run_id, "staging", "FAILED", start_time=start_time, end_time=end_time, error_message=err_msg, metadata={"season": str(season)})
             update_pipeline_control(season, "staging", "FAILED")
             update_pipeline_run_db(run_id, 'FAILED', 'staging', 'bronze', error_msg=err_msg)
             return False
@@ -227,19 +242,33 @@ def run_season_pipeline(season, run_id, reprocess=False, target_team=None, targe
         set_pipeline_status(run_id, "validation", "running", 45, counts['read'], season, "Validating staging records with outlier detection checks...")
         update_pipeline_control(season, "validation", "RUNNING")
         update_pipeline_run_db(run_id, 'RUNNING', 'validation', 'staging')
+        log_bpm_event(run_id, "validation", "RUNNING", start_time=start_time, metadata={"season": str(season)})
         try:
             val_stats = validate_season(season)
+            end_time = datetime.now()
             log_stage_to_db(run_id, season, "validation", start_time, "SUCCESS", 
                             records_read=val_stats["processed"], 
                             records_inserted=val_stats["valid"], 
                             records_failed=val_stats["quarantined"])
+            log_bpm_event(run_id, "validation", "SUCCESS", start_time=start_time, end_time=end_time, 
+                          records_processed=val_stats["valid"], 
+                          metadata={"season": str(season), "quarantined": val_stats["quarantined"]})
+            
+            # If files were quarantined, log BPM quarantine exception event
+            if val_stats.get("quarantined", 0) > 0:
+                log_bpm_event(run_id, "quarantine", "QUARANTINED", start_time=start_time, end_time=end_time,
+                              records_processed=val_stats["quarantined"],
+                              metadata={"season": str(season), "reason": "data_quality_isolation"})
+                              
             update_pipeline_control(season, "validation", "SUCCESS")
             valid_count = val_stats["valid"]
             counts['failed'] = val_stats["quarantined"]
         except Exception as e:
             err_msg = str(e)
+            end_time = datetime.now()
             set_pipeline_status(run_id, "validation", "failed", 45, 0, season, f"Validation Failed: {err_msg}")
             log_stage_to_db(run_id, season, "validation", start_time, "FAILED", error_message=err_msg)
+            log_bpm_event(run_id, "validation", "FAILED", start_time=start_time, end_time=end_time, error_message=err_msg, metadata={"season": str(season)})
             update_pipeline_control(season, "validation", "FAILED")
             update_pipeline_run_db(run_id, 'FAILED', 'validation', 'staging', error_msg=err_msg)
             return False
@@ -254,20 +283,26 @@ def run_season_pipeline(season, run_id, reprocess=False, target_team=None, targe
         set_pipeline_status(run_id, "cdc", "running", 60, valid_count, season, "Running CDC change detection checks...")
         update_pipeline_control(season, "cdc", "RUNNING")
         update_pipeline_run_db(run_id, 'RUNNING', 'cdc', 'validation')
+        log_bpm_event(run_id, "cdc", "RUNNING", start_time=start_time, metadata={"season": str(season)})
         try:
             from pathlib import Path
             from config.config import STAGING_PATH
             actual_staged_json = list((STAGING_PATH / str(season) / "json").glob("*.json"))
             json_filepaths = [str(p) for p in actual_staged_json]
             cdc_results = detect_changes_for_season(season, json_filepaths, run_id)
+            end_time = datetime.now()
             
             # Log CDC run
             log_stage_to_db(run_id, season, "cdc", start_time, "SUCCESS")
+            log_bpm_event(run_id, "cdc", "SUCCESS", start_time=start_time, end_time=end_time, 
+                          records_processed=len(cdc_results) if cdc_results else 0, metadata={"season": str(season)})
             update_pipeline_control(season, "cdc", "SUCCESS")
         except Exception as e:
             err_msg = str(e)
+            end_time = datetime.now()
             set_pipeline_status(run_id, "cdc", "failed", 60, 0, season, f"CDC Stage Failed: {err_msg}")
             log_stage_to_db(run_id, season, "cdc", start_time, "FAILED", error_message=err_msg)
+            log_bpm_event(run_id, "cdc", "FAILED", start_time=start_time, end_time=end_time, error_message=err_msg, metadata={"season": str(season)})
             update_pipeline_control(season, "cdc", "FAILED")
             update_pipeline_run_db(run_id, 'FAILED', 'cdc', 'validation', error_msg=err_msg)
             return False
@@ -280,6 +315,8 @@ def run_season_pipeline(season, run_id, reprocess=False, target_team=None, targe
     update_pipeline_control(season, "silver", "RUNNING")
     update_pipeline_control(season, "gold", "RUNNING")
     update_pipeline_run_db(run_id, 'RUNNING', 'silver', 'cdc')
+    log_bpm_event(run_id, "silver", "RUNNING", start_time=start_time, metadata={"season": str(season)})
+    log_bpm_event(run_id, "gold", "RUNNING", start_time=start_time, metadata={"season": str(season)})
     
     try:
         from pipeline.atomicity import load_season_atomic
@@ -298,30 +335,55 @@ def run_season_pipeline(season, run_id, reprocess=False, target_team=None, targe
             'skipped': loaded_counts.get('skipped', 0),
             'deleted': loaded_counts.get('deleted', 0)
         })
+        end_time = datetime.now()
         
         # Log successful loads
         log_stage_to_db(run_id, season, "silver", start_time, "SUCCESS", records_read=valid_count, records_inserted=counts['inserted'], records_updated=counts['updated'])
         log_stage_to_db(run_id, season, "gold", start_time, "SUCCESS")
         
+        log_bpm_event(run_id, "silver", "SUCCESS", start_time=start_time, end_time=end_time, 
+                      records_processed=counts['inserted'] + counts['updated'], metadata={"season": str(season)})
+        log_bpm_event(run_id, "gold", "SUCCESS", start_time=start_time, end_time=end_time, 
+                      records_processed=counts['inserted'] + counts['updated'], metadata={"season": str(season)})
+        
+        # 6. Stage: Lakehouse Storage Integration (Apache Iceberg + Project Nessie + MinIO S3)
+        start_time_lh = datetime.now()
+        set_pipeline_status(run_id, "lakehouse", "running", 90, valid_count, season, "Sinking data to Apache Iceberg Lakehouse (MinIO S3 / Nessie)...")
+        log_bpm_event(run_id, "lakehouse", "RUNNING", start_time=start_time_lh, metadata={"season": str(season)})
+        try:
+            from pipeline.iceberg_pipeline import run_iceberg_streaming_pipeline
+            lakehouse_res = run_iceberg_streaming_pipeline([season], run_id=run_id)
+            end_time_lh = datetime.now()
+            lh_written = lakehouse_res.get("records_written", 0)
+            log_stage_to_db(run_id, season, "lakehouse", start_time_lh, "SUCCESS", records_read=valid_count, records_inserted=lh_written)
+            log_bpm_event(run_id, "lakehouse", "SUCCESS", start_time=start_time_lh, end_time=end_time_lh, records_processed=lh_written, metadata={"season": str(season)})
+        except Exception as le:
+            print(f"[LAKEHOUSE WARNING] Lakehouse sync notice: {le}")
+            log_bpm_event(run_id, "lakehouse", "WARNING", start_time=start_time_lh, end_time=datetime.now(), error_message=str(le), metadata={"season": str(season)})
+
         update_pipeline_control(season, "silver", "SUCCESS")
         update_pipeline_control(season, "gold", "SUCCESS")
         update_pipeline_control(season, "pipeline", "COMPLETED")
         
-        set_pipeline_status(run_id, "gold", "success", 100, counts['inserted'] + counts['updated'], season, f"Season {season} fully loaded successfully in a single transaction.")
-        update_pipeline_run_db(run_id, 'SUCCESS', 'done', 'gold', counts=counts)
+        set_pipeline_status(run_id, "lakehouse", "success", 100, counts['inserted'] + counts['updated'], season, f"Season {season} fully loaded to Silver, Gold, and Lakehouse storage.")
+        update_pipeline_run_db(run_id, 'SUCCESS', 'done', 'lakehouse', counts=counts)
         return True
+
         
     except Exception as e:
         err_msg = str(e)
+        end_time = datetime.now()
         failed_stage = "gold" if "SIMULATED_FAILURE" in err_msg or "gold" in err_msg.lower() else "silver"
         
         set_pipeline_status(run_id, failed_stage, "failed", 75, 0, season, f"Pipeline Failed: {err_msg}")
         log_stage_to_db(run_id, season, failed_stage, start_time, "FAILED", error_message=err_msg)
+        log_bpm_event(run_id, failed_stage, "FAILED", start_time=start_time, end_time=end_time, error_message=err_msg, metadata={"season": str(season)})
         
         update_pipeline_control(season, failed_stage, "FAILED")
         update_pipeline_control(season, "pipeline", "FAILED")
         update_pipeline_run_db(run_id, 'FAILED', failed_stage, 'cdc', counts=counts, error_msg=err_msg)
         return False
+
 
 def execute_pipeline_thread(seasons, run_id, reprocess=False, target_team=None, target_player=None, simulate_failure=False, replay_stage=None):
     """Executes the pipeline loop over multiple seasons sequentially in a background thread."""

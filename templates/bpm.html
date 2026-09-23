@@ -1,0 +1,423 @@
+{% extends "base.html" %}
+
+{% block title %}Process BPM & Real-Time Analytics | IPL Platform{% endblock %}
+{% block header_title %}Business Process Management (BPM) Analytics{% endblock %}
+
+{% block content %}
+<div class="analytics-wrapper" style="display: flex; flex-direction: column; gap: 1.5rem;">
+
+    <!-- BPM Introduction & Architecture Banner -->
+    <div class="glass-card" style="padding: 1.25rem 1.75rem; border-left: 4px solid var(--primary-cyan);">
+        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;">
+            <div>
+                <h3 style="font-family: var(--font-heading); color: var(--text-primary); margin-bottom: 0.25rem;">
+                    <i class="fa-solid fa-diagram-project" style="color: var(--primary-cyan); margin-right: 8px;"></i>
+                    Pipeline Process Modeling & Real-Time Anomaly Engine
+                </h3>
+                <p style="color: var(--text-secondary); font-size: 0.9rem;">
+                    Monitors end-to-end data engineering lifecycle: Cycle Times, Bottleneck Stages, SLA Compliance, Out-of-Sequence Deviations, and PySpark Streaming.
+                </p>
+            </div>
+            <div style="display: flex; gap: 0.75rem;">
+                <button type="button" class="btn" style="background: rgba(0, 242, 254, 0.15); color: var(--primary-cyan); border: 1px solid var(--primary-cyan); font-size: 0.85rem; padding: 0.5rem 1rem;" onclick="refreshBpmDashboard()">
+                    <i class="fa-solid fa-arrows-rotate"></i> Refresh BPM Metrics
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 1. Executive BPM KPI Cards -->
+    <div class="metrics-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem;">
+        
+        <div class="glass-card metric-card" style="padding: 1.2rem; border-top: 3px solid var(--primary-cyan);">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <span style="font-size: 0.8rem; color: var(--text-secondary); text-transform: uppercase;">Avg Cycle Time</span>
+                <i class="fa-solid fa-stopwatch" style="color: var(--primary-cyan);"></i>
+            </div>
+            <h2 id="kpi-cycle-time" style="font-size: 1.8rem; margin-top: 0.4rem; color: var(--text-primary); font-family: var(--font-heading);">0.0s</h2>
+            <span style="font-size: 0.75rem; color: var(--text-tertiary);">Total elapsed duration</span>
+        </div>
+
+        <div class="glass-card metric-card" style="padding: 1.2rem; border-top: 3px solid var(--primary-purple);">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <span style="font-size: 0.8rem; color: var(--text-secondary); text-transform: uppercase;">Throughput</span>
+                <i class="fa-solid fa-bolt" style="color: var(--primary-purple);"></i>
+            </div>
+            <h2 id="kpi-throughput" style="font-size: 1.8rem; margin-top: 0.4rem; color: var(--text-primary); font-family: var(--font-heading);">0 rec/s</h2>
+            <span style="font-size: 0.75rem; color: var(--text-tertiary);">Operational rate</span>
+        </div>
+
+        <div class="glass-card metric-card" style="padding: 1.2rem; border-top: 3px solid var(--neon-green);">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <span style="font-size: 0.8rem; color: var(--text-secondary); text-transform: uppercase;">SLA Compliance</span>
+                <i class="fa-solid fa-circle-check" style="color: var(--neon-green);"></i>
+            </div>
+            <h2 id="kpi-sla-compliance" style="font-size: 1.8rem; margin-top: 0.4rem; color: var(--neon-green); font-family: var(--font-heading);">100%</h2>
+            <span style="font-size: 0.75rem; color: var(--text-tertiary);">Stages meeting SLA</span>
+        </div>
+
+        <div class="glass-card metric-card" style="padding: 1.2rem; border-top: 3px solid var(--accent-orange);">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <span style="font-size: 0.8rem; color: var(--text-secondary); text-transform: uppercase;">Primary Bottleneck</span>
+                <i class="fa-solid fa-triangle-exclamation" style="color: var(--accent-orange);"></i>
+            </div>
+            <h2 id="kpi-bottleneck" style="font-size: 1.2rem; margin-top: 0.6rem; color: var(--accent-orange); font-family: var(--font-heading); text-transform: uppercase;">None</h2>
+            <span style="font-size: 0.75rem; color: var(--text-tertiary);">Max latency stage</span>
+        </div>
+
+        <div class="glass-card metric-card" style="padding: 1.2rem; border-top: 3px solid var(--neon-red);">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <span style="font-size: 0.8rem; color: var(--text-secondary); text-transform: uppercase;">Active Anomalies</span>
+                <i class="fa-solid fa-shield-virus" style="color: var(--neon-red);"></i>
+            </div>
+            <h2 id="kpi-anomalies" style="font-size: 1.8rem; margin-top: 0.4rem; color: var(--neon-red); font-family: var(--font-heading);">0</h2>
+            <span style="font-size: 0.75rem; color: var(--text-tertiary);">Breaches & deviations</span>
+        </div>
+
+        <div class="glass-card metric-card" style="padding: 1.2rem; border-top: 3px solid var(--neon-blue);">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <span style="font-size: 0.8rem; color: var(--text-secondary); text-transform: uppercase;">Streaming Engine</span>
+                <i class="fa-solid fa-microchip" style="color: var(--neon-blue);"></i>
+            </div>
+            <h2 id="kpi-streaming-engine" style="font-size: 1.1rem; margin-top: 0.7rem; color: var(--neon-blue); font-family: var(--font-heading);">PySpark Stream</h2>
+            <span style="font-size: 0.75rem; color: var(--text-tertiary);">Structured Streaming</span>
+        </div>
+
+    </div>
+
+    <!-- 2. Interactive BPM Charts & Topology -->
+    <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 1.5rem;">
+        
+        <!-- Stage Duration vs SLA Chart -->
+        <div class="glass-card" style="padding: 1.5rem;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                <h4 style="font-family: var(--font-heading); color: var(--text-primary);">
+                    <i class="fa-solid fa-chart-column" style="color: var(--primary-cyan); margin-right: 6px;"></i>
+                    Stage Processing Latency vs. SLA Thresholds
+                </h4>
+                <span style="font-size: 0.8rem; color: var(--text-secondary);">Seconds</span>
+            </div>
+            <div style="position: relative; height: 280px;">
+                <canvas id="bpmStageChart"></canvas>
+            </div>
+        </div>
+
+        <!-- BPM Process Topology / Lifecycle Card -->
+        <div class="glass-card" style="padding: 1.5rem; display: flex; flex-direction: column; justify-content: space-between;">
+            <div>
+                <h4 style="font-family: var(--font-heading); color: var(--text-primary); margin-bottom: 1rem;">
+                    <i class="fa-solid fa-network-wired" style="color: var(--primary-purple); margin-right: 6px;"></i>
+                    BPM Lifecycle Topology
+                </h4>
+                
+                <div style="display: flex; flex-direction: column; gap: 0.6rem; font-size: 0.85rem;">
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <span class="badge" style="background: rgba(0, 242, 254, 0.2); color: var(--primary-cyan); min-width: 24px; text-align: center;">1</span>
+                        <span><strong>Bronze Ingestion:</strong> Checksum & source registry</span>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <span class="badge" style="background: rgba(79, 172, 254, 0.2); color: var(--primary-purple); min-width: 24px; text-align: center;">2</span>
+                        <span><strong>Kafka Streaming:</strong> Producer & Consumer transport</span>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <span class="badge" style="background: rgba(0, 210, 255, 0.2); color: var(--neon-blue); min-width: 24px; text-align: center;">3</span>
+                        <span><strong>Staging Layer:</strong> JSON & Columnar Parquet</span>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <span class="badge" style="background: rgba(255, 179, 0, 0.2); color: var(--accent-orange); min-width: 24px; text-align: center;">4</span>
+                        <span><strong>Validation Gate:</strong> 11 Rules & Quarantine</span>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <span class="badge" style="background: rgba(57, 255, 20, 0.2); color: var(--neon-green); min-width: 24px; text-align: center;">5</span>
+                        <span><strong>CDC Delta:</strong> SHA-256 state comparison</span>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <span class="badge" style="background: rgba(255, 56, 96, 0.2); color: var(--neon-red); min-width: 24px; text-align: center;">6</span>
+                        <span><strong>Atomic SQL:</strong> Silver 3NF & Gold OLAP</span>
+                    </div>
+                </div>
+            </div>
+
+            <div style="margin-top: 1rem; padding: 0.75rem; border-radius: 8px; background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.05); font-size: 0.8rem; color: var(--text-secondary);">
+                <i class="fa-solid fa-shield-halved" style="color: var(--neon-green); margin-right: 4px;"></i>
+                <strong>Exception Gate:</strong> Validation failures transition to Quarantine as a verified valid exception path.
+            </div>
+        </div>
+
+    </div>
+
+    <!-- 3. Real-Time Anomaly Audit Alerts -->
+    <div class="glass-card" style="padding: 1.5rem;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+            <h4 style="font-family: var(--font-heading); color: var(--text-primary);">
+                <i class="fa-solid fa-triangle-exclamation" style="color: var(--neon-red); margin-right: 6px;"></i>
+                Process Anomaly & SLA Breach Audit
+            </h4>
+            <span id="anomaly-badge-count" class="badge" style="background: rgba(255, 56, 96, 0.2); color: var(--neon-red);">0 Anomalies</span>
+        </div>
+
+        <div style="overflow-x: auto;">
+            <table class="data-table" style="width: 100%; border-collapse: collapse; font-size: 0.85rem;">
+                <thead>
+                    <tr style="border-bottom: 1px solid rgba(255, 255, 255, 0.1); text-align: left; color: var(--text-secondary);">
+                        <th style="padding: 0.75rem;">Anomaly Type</th>
+                        <th style="padding: 0.75rem;">Severity</th>
+                        <th style="padding: 0.75rem;">Stage / Activity</th>
+                        <th style="padding: 0.75rem;">Case ID</th>
+                        <th style="padding: 0.75rem;">Description / Audit Reason</th>
+                    </tr>
+                </thead>
+                <tbody id="anomaly-table-body">
+                    <tr>
+                        <td colspan="5" style="text-align: center; padding: 1.5rem; color: var(--text-tertiary);">
+                            <i class="fa-solid fa-circle-check" style="color: var(--neon-green); margin-right: 6px;"></i>
+                            No active SLA breaches or sequence anomalies detected.
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- 4. Chronological BPM Event Stream Table -->
+    <div class="glass-card" style="padding: 1.5rem;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+            <h4 style="font-family: var(--font-heading); color: var(--text-primary);">
+                <i class="fa-solid fa-list-check" style="color: var(--primary-cyan); margin-right: 6px;"></i>
+                BPM Event Log Stream (`bpm_process_events`)
+            </h4>
+            <span style="font-size: 0.8rem; color: var(--text-secondary);">Live Event Taxonomy</span>
+        </div>
+
+        <div style="overflow-x: auto; max-height: 380px;">
+            <table class="data-table" style="width: 100%; border-collapse: collapse; font-size: 0.85rem;">
+                <thead>
+                    <tr style="border-bottom: 1px solid rgba(255, 255, 255, 0.1); text-align: left; color: var(--text-secondary);">
+                        <th style="padding: 0.75rem;">Case ID</th>
+                        <th style="padding: 0.75rem;">Activity</th>
+                        <th style="padding: 0.75rem;">Status</th>
+                        <th style="padding: 0.75rem;">Start Timestamp</th>
+                        <th style="padding: 0.75rem;">End Timestamp</th>
+                        <th style="padding: 0.75rem;">Duration</th>
+                        <th style="padding: 0.75rem;">Records</th>
+                    </tr>
+                </thead>
+                <tbody id="bpm-events-table-body">
+                    <tr>
+                        <td colspan="7" style="text-align: center; padding: 1.5rem; color: var(--text-tertiary);">
+                            Loading process events...
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+</div>
+
+<!-- Client-side Real-time BPM Script -->
+<script>
+    let bpmChartInstance = null;
+
+    async function refreshBpmDashboard() {
+        try {
+            // 1. Fetch Process Summary
+            const summaryRes = await fetch('/api/bpm/summary');
+            const summary = await summaryRes.json();
+
+            // Update KPI cards
+            document.getElementById('kpi-cycle-time').textContent = `${summary.cycle_time_seconds || 0}s`;
+            document.getElementById('kpi-throughput').textContent = `${summary.throughput_rps || 0} rec/s`;
+            
+            const slaPct = summary.sla_compliance ? summary.sla_compliance.compliance_pct : 100;
+            const slaEl = document.getElementById('kpi-sla-compliance');
+            slaEl.textContent = `${slaPct}%`;
+            slaEl.style.color = slaPct >= 80 ? 'var(--neon-green)' : (slaPct >= 50 ? 'var(--accent-orange)' : 'var(--neon-red)');
+
+            document.getElementById('kpi-bottleneck').textContent = summary.primary_bottleneck || 'None';
+
+            // 2. Fetch Anomalies
+            const anomRes = await fetch('/api/bpm/anomalies');
+            const anomData = await anomRes.json();
+            const anomCount = anomData.anomaly_count || 0;
+            document.getElementById('kpi-anomalies').textContent = anomCount;
+            document.getElementById('anomaly-badge-count').textContent = `${anomCount} Anomalies`;
+
+            renderAnomalyTable(anomData.anomalies || []);
+
+            // 3. Fetch Event Stream
+            const eventsRes = await fetch('/api/bpm/events?limit=50');
+            const events = await eventsRes.json();
+            renderEventsTable(events || []);
+
+            // 4. Render Stage Duration Chart
+            renderBpmChart(summary.stage_durations || {});
+
+            // 5. Fetch Streaming Summary
+            const streamRes = await fetch('/api/bpm/stream-summary');
+            const streamData = await streamRes.json();
+            if (streamData.streaming_engine) {
+                document.getElementById('kpi-streaming-engine').textContent = streamData.streaming_engine;
+            }
+
+        } catch (err) {
+            console.error('Failed to load BPM metrics:', err);
+        }
+    }
+
+    function renderAnomalyTable(anomalies) {
+        const tbody = document.getElementById('anomaly-table-body');
+        if (!tbody) return;
+
+        if (anomalies.length === 0) {
+            tbody.innerHTML = `
+                <tr>
+                    <td colspan="5" style="text-align: center; padding: 1.5rem; color: var(--text-tertiary);">
+                        <i class="fa-solid fa-circle-check" style="color: var(--neon-green); margin-right: 6px;"></i>
+                        No active SLA breaches or sequence anomalies detected.
+                    </td>
+                </tr>
+            `;
+            return;
+        }
+
+        let html = '';
+        for (const a of anomalies) {
+            const isHigh = a.severity === 'HIGH' || a.severity === 'CRITICAL';
+            html += `
+                <tr style="border-bottom: 1px solid rgba(255, 255, 255, 0.04);">
+                    <td style="padding: 0.75rem; font-weight: 600; color: ${isHigh ? 'var(--neon-red)' : 'var(--accent-orange)'};">
+                        <i class="fa-solid ${a.type === 'SLA_BREACH' ? 'fa-hourglass-end' : 'fa-triangle-exclamation'}"></i> ${a.type}
+                    </td>
+                    <td style="padding: 0.75rem;">
+                        <span class="badge" style="background: ${isHigh ? 'rgba(255, 56, 96, 0.2)' : 'rgba(255, 179, 0, 0.2)'}; color: ${isHigh ? 'var(--neon-red)' : 'var(--accent-orange)'};">
+                            ${a.severity}
+                        </span>
+                    </td>
+                    <td style="padding: 0.75rem; text-transform: uppercase;">${a.activity || a.from_activity || '-'}</td>
+                    <td style="padding: 0.75rem; font-family: monospace; font-size: 0.8rem;">${(a.case_id || '').substring(0, 12)}...</td>
+                    <td style="padding: 0.75rem; color: var(--text-secondary);">${a.message}</td>
+                </tr>
+            `;
+        }
+        tbody.innerHTML = html;
+    }
+
+    function renderEventsTable(events) {
+        const tbody = document.getElementById('bpm-events-table-body');
+        if (!tbody) return;
+
+        if (events.length === 0) {
+            tbody.innerHTML = `
+                <tr>
+                    <td colspan="7" style="text-align: center; padding: 1.5rem; color: var(--text-tertiary);">
+                        No BPM events recorded yet. Run a pipeline to generate live events.
+                    </td>
+                </tr>
+            `;
+            return;
+        }
+
+        let html = '';
+        for (const e of events) {
+            const statusColor = e.status === 'SUCCESS' ? 'var(--neon-green)' : (e.status === 'FAILED' ? 'var(--neon-red)' : (e.status === 'QUARANTINED' ? 'var(--accent-orange)' : 'var(--primary-cyan)'));
+            html += `
+                <tr style="border-bottom: 1px solid rgba(255, 255, 255, 0.04);">
+                    <td style="padding: 0.75rem; font-family: monospace; font-size: 0.8rem; color: var(--text-secondary);">
+                        ${(e.case_id || '').substring(0, 8)}...
+                    </td>
+                    <td style="padding: 0.75rem; font-weight: 500; text-transform: uppercase;">
+                        ${e.activity}
+                    </td>
+                    <td style="padding: 0.75rem;">
+                        <span class="badge" style="background: rgba(255, 255, 255, 0.05); color: ${statusColor}; border: 1px solid ${statusColor};">
+                            ${e.status}
+                        </span>
+                    </td>
+                    <td style="padding: 0.75rem; color: var(--text-tertiary); font-size: 0.8rem;">
+                        ${(e.event_timestamp || '').replace('T', ' ').substring(0, 19)}
+                    </td>
+                    <td style="padding: 0.75rem; color: var(--text-tertiary); font-size: 0.8rem;">
+                        ${e.end_timestamp ? e.end_timestamp.replace('T', ' ').substring(0, 19) : '-'}
+                    </td>
+                    <td style="padding: 0.75rem; font-weight: 600; color: var(--text-primary);">
+                        ${e.duration_seconds !== null && e.duration_seconds !== undefined ? e.duration_seconds + 's' : '-'}
+                    </td>
+                    <td style="padding: 0.75rem; color: var(--primary-cyan);">
+                        ${e.records_processed || 0}
+                    </td>
+                </tr>
+            `;
+        }
+        tbody.innerHTML = html;
+    }
+
+    function renderBpmChart(durations) {
+        const ctx = document.getElementById('bpmStageChart');
+        if (!ctx) return;
+
+        const labels = Object.keys(durations).length > 0 ? Object.keys(durations) : ['bronze', 'staging', 'validation', 'cdc', 'silver', 'gold'];
+        const dataValues = labels.map(k => durations[k] || 0);
+
+        // Predefined SLA limits for display comparison
+        const slaMap = { 'bronze': 30, 'staging': 25, 'validation': 15, 'cdc': 15, 'silver': 30, 'gold': 25, 'quarantine': 10 };
+        const slaValues = labels.map(k => slaMap[k] || 25);
+
+        if (bpmChartInstance) {
+            bpmChartInstance.destroy();
+        }
+
+        bpmChartInstance = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: labels.map(l => l.toUpperCase()),
+                datasets: [
+                    {
+                        label: 'Actual Duration (s)',
+                        data: dataValues,
+                        backgroundColor: 'rgba(0, 242, 254, 0.75)',
+                        borderColor: '#00f2fe',
+                        borderWidth: 1,
+                        borderRadius: 4
+                    },
+                    {
+                        label: 'SLA Benchmark Limit (s)',
+                        data: slaValues,
+                        backgroundColor: 'rgba(255, 56, 96, 0.25)',
+                        borderColor: '#ff3860',
+                        borderWidth: 1,
+                        borderDash: [5, 5],
+                        borderRadius: 4
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        labels: { color: '#9ca3af', font: { family: 'Inter', size: 11 } }
+                    }
+                },
+                scales: {
+                    x: {
+                        grid: { color: 'rgba(255, 255, 255, 0.05)' },
+                        ticks: { color: '#9ca3af', font: { family: 'Inter', size: 10 } }
+                    },
+                    y: {
+                        beginAtZero: true,
+                        grid: { color: 'rgba(255, 255, 255, 0.05)' },
+                        ticks: { color: '#9ca3af', font: { family: 'Inter', size: 10 } }
+                    }
+                }
+            }
+        });
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+        refreshBpmDashboard();
+        // Auto-refresh every 10 seconds
+        setInterval(refreshBpmDashboard, 10000);
+    });
+</script>
+{% endblock %}

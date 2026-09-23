@@ -58,7 +58,32 @@
                         <span>Analytics Dashboard</span>
                     </a>
                 </li>
+                <li class="{% if request.blueprint == 'bpm' %}active{% endif %}">
+                    <a href="{{ url_for('bpm.bpm_dashboard') }}">
+                        <i class="fa-solid fa-diagram-project"></i>
+                        <span>Process BPM Analytics</span>
+                    </a>
+                </li>
             </ul>
+
+            <!-- Active Database Status Card in Sidebar -->
+            <div class="sidebar-db-card">
+                <div class="sidebar-db-header">
+                    <span>Active Storage</span>
+                    <span id="sidebar-db-indicator" class="status-dot"></span>
+                </div>
+                <div class="sidebar-db-title">
+                    <i class="fa-solid {% if is_online_db %}fa-cloud{% else %}fa-hard-drive{% endif %}" id="sidebar-db-icon" style="color: {% if is_online_db %}var(--primary-cyan){% else %}var(--neon-green){% endif %};"></i>
+                    <span id="sidebar-db-name">{{ active_db_label }}</span>
+                </div>
+                <div class="sidebar-db-details" id="sidebar-db-details">
+                    {% if is_online_db %}
+                    Host: aws-0-ap-southeast-2 (Supabase)
+                    {% else %}
+                    Host: localhost:5432 (Postgres)
+                    {% endif %}
+                </div>
+            </div>
         </aside>
 
         <!-- Main Workspace -->
@@ -67,16 +92,43 @@
                 <div>
                     <h2 class="gradient-text">{% block header_title %}IPL Data Engineering{% endblock %}</h2>
                     <p style="color: var(--text-secondary); font-size: 0.9rem;">
-                        Local PostgreSQL Serving Layer Connected
+                        Target Database: 
+                        <span id="current-db-label" style="font-weight: 600; color: {% if is_online_db %}var(--primary-cyan){% else %}var(--neon-green){% endif %};">
+                            <i class="fa-solid {% if is_online_db %}fa-cloud{% else %}fa-hard-drive{% endif %}"></i> {{ active_db_label }}
+                        </span>
                     </p>
                 </div>
-                <div style="font-size: 0.9rem; color: var(--text-tertiary);">
-                    <i class="fa-solid fa-server" style="color: var(--neon-green); margin-right: 5px;"></i>
-                    Active System
+                
+                <!-- Database Mode Switcher Widget -->
+                <div class="db-switcher-widget">
+                    <div class="db-toggle-container">
+                        <span class="db-toggle-label"><i class="fa-solid fa-server"></i> DB Target:</span>
+                        <div class="db-pill-selector">
+                            <button type="button" 
+                                    class="db-pill-btn {% if is_online_db %}active online{% endif %}" 
+                                    id="btn-switch-online" 
+                                    onclick="switchDatabase('online')" 
+                                    title="Connect to Supabase Cloud PostgreSQL">
+                                <i class="fa-solid fa-cloud"></i> Online (Cloud)
+                            </button>
+                            <button type="button" 
+                                    class="db-pill-btn {% if not is_online_db %}active offline{% endif %}" 
+                                    id="btn-switch-offline" 
+                                    onclick="switchDatabase('offline')" 
+                                    title="Connect to Local PostgreSQL (Port 5432)">
+                                <i class="fa-solid fa-hard-drive"></i> Offline (Local)
+                            </button>
+                        </div>
+                    </div>
+                    <div id="db-status-badge" class="db-status-badge">
+                        <span class="status-dot" id="header-status-dot"></span>
+                        <span id="db-status-text" style="color: var(--text-secondary);">Checking...</span>
+                    </div>
                 </div>
             </header>
 
             <!-- Alerts Container -->
+            <div id="dynamic-alert-container"></div>
             {% with messages = get_flashed_messages(with_categories=true) %}
               {% if messages %}
                 <div style="display: flex; flex-direction: column; gap: 1rem; margin-bottom: 1rem;">
@@ -96,6 +148,109 @@
             {% block content %}{% endblock %}
         </main>
     </div>
+
+    <!-- Global Database Switcher Script -->
+    <script>
+        // Check active database latency & connection status on load
+        async function checkDatabaseHealth() {
+            const statusText = document.getElementById('db-status-text');
+            const statusDot = document.getElementById('header-status-dot');
+            try {
+                const response = await fetch('/api/db/status');
+                const data = await response.json();
+                if (data.status === 'success') {
+                    const activeStat = data.active_mode === 'online' ? data.online : data.offline;
+                    if (activeStat && activeStat.success) {
+                        statusText.textContent = `${activeStat.latency_ms} ms`;
+                        statusText.style.color = 'var(--neon-green)';
+                        statusDot.className = 'status-dot';
+                    } else {
+                        statusText.textContent = 'Disconnected';
+                        statusText.style.color = 'var(--neon-red)';
+                        statusDot.className = 'status-dot error';
+                    }
+                }
+            } catch (err) {
+                console.warn('DB Health check error:', err);
+                if (statusText) statusText.textContent = 'Connected';
+            }
+        }
+
+        // Switch Database Target
+        async function switchDatabase(targetMode) {
+            const btnOnline = document.getElementById('btn-switch-online');
+            const btnOffline = document.getElementById('btn-switch-offline');
+            const statusText = document.getElementById('db-status-text');
+            const statusDot = document.getElementById('header-status-dot');
+
+            // Indicate loading state
+            if (statusDot) statusDot.className = 'status-dot loading';
+            if (statusText) statusText.textContent = 'Switching...';
+
+            try {
+                const response = await fetch('/api/db/switch', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ mode: targetMode })
+                });
+                const result = await response.json();
+
+                if (result.status === 'success') {
+                    // Update buttons
+                    if (result.active_mode === 'online') {
+                        btnOnline.className = 'db-pill-btn active online';
+                        btnOffline.className = 'db-pill-btn';
+                    } else {
+                        btnOffline.className = 'db-pill-btn active offline';
+                        btnOnline.className = 'db-pill-btn';
+                    }
+
+                    // Show success banner
+                    showFloatingAlert(`Switched database to ${result.active_label}`, 'success');
+
+                    // Refresh page after a brief moment to update tables & charts
+                    setTimeout(() => {
+                        window.location.reload();
+                    }, 600);
+                } else {
+                    showFloatingAlert(result.message || 'Failed to switch database.', 'error');
+                    if (statusDot) statusDot.className = 'status-dot error';
+                    if (statusText) statusText.textContent = 'Failed';
+                }
+            } catch (err) {
+                console.error('Error switching database:', err);
+                showFloatingAlert('Network error when switching database.', 'error');
+                if (statusDot) statusDot.className = 'status-dot error';
+                if (statusText) statusText.textContent = 'Error';
+            }
+        }
+
+        function showFloatingAlert(msg, type) {
+            const container = document.getElementById('dynamic-alert-container');
+            if (!container) return;
+            const isSuccess = type === 'success';
+            const alertDiv = document.createElement('div');
+            alertDiv.style.cssText = `
+                padding: 0.9rem 1.2rem;
+                border-radius: 10px;
+                font-weight: 500;
+                margin-bottom: 1rem;
+                display: flex;
+                align-items: center;
+                gap: 8px;
+                border: 1px solid rgba(255, 255, 255, 0.08);
+                background-color: ${isSuccess ? 'rgba(57, 255, 20, 0.15)' : 'rgba(255, 56, 96, 0.15)'};
+                color: ${isSuccess ? 'var(--neon-green)' : 'var(--neon-red)'};
+                transition: all 0.3s ease;
+            `;
+            alertDiv.innerHTML = `<i class="fa-solid ${isSuccess ? 'fa-circle-check' : 'fa-circle-exclamation'}"></i> <span>${msg}</span>`;
+            container.appendChild(alertDiv);
+        }
+
+        // Run health check on initial page load
+        document.addEventListener('DOMContentLoaded', checkDatabaseHealth);
+    </script>
+
     {% block scripts %}{% endblock %}
 </body>
 </html>
