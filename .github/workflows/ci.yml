@@ -49,12 +49,16 @@ jobs:
 
     - name: Initialize Test Database Schema
       env:
+        DB_MODE: offline
+        LOCAL_DATABASE_URL: postgresql://postgres:password123@localhost:5432/postgres
         DATABASE_URL: postgresql://postgres:password123@localhost:5432/postgres
       run: |
         python -c "from database.connection import init_db; init_db()"
 
-    - name: Run Data Pipeline Unit & Mock Tests
+    - name: Run Data Pipeline Unit & Integration Tests (pytest)
       env:
+        DB_MODE: offline
+        LOCAL_DATABASE_URL: postgresql://postgres:password123@localhost:5432/postgres
         DATABASE_URL: postgresql://postgres:password123@localhost:5432/postgres
       run: |
-        python -m unittest discover -s tests -p "test_*.py"
+        pytest tests/ -v

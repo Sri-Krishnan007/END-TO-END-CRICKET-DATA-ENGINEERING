@@ -42,6 +42,8 @@ data/gold/*
 !data/gold/.gitkeep
 data/quarantine/*
 !data/quarantine/.gitkeep
+data/warehouse/*
+data/checkpoints/*
 
 # Environments & Virtual Environments
 .env

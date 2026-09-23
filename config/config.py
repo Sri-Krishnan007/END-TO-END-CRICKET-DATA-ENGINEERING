@@ -22,7 +22,7 @@ CONFIG_STATE_FILE = PROJECT_ROOT / "config" / "db_config.json"
 # Database Configuration
 LOCAL_DB_URL = os.environ.get(
     "LOCAL_DATABASE_URL", 
-    "postgresql://postgres:krish%40123@localhost:5432/postgres"
+    os.environ.get("DATABASE_URL", "postgresql://postgres:krish%40123@localhost:5432/postgres")
 )
 ONLINE_DB_URL = os.environ.get(
     "ONLINE_DATABASE_URL", 
