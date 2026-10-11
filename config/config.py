@@ -76,6 +76,14 @@ ICEBERG_WAREHOUSE_PATH = os.environ.get("ICEBERG_WAREHOUSE_PATH", "s3a://warehou
 ICEBERG_CHECKPOINT_PATH = PROJECT_ROOT / "data" / "checkpoints" / "iceberg_streaming"
 ICEBERG_TABLE_NAME = "ipl.ipl_matches"
 
+# Trino Distributed Query Engine Configuration (Week 3)
+TRINO_HOST = os.environ.get("TRINO_HOST", "localhost")
+TRINO_PORT = int(os.environ.get("TRINO_PORT", 8085))
+TRINO_USER = os.environ.get("TRINO_USER", "admin")
+TRINO_CATALOG = os.environ.get("TRINO_CATALOG", "iceberg")
+TRINO_SCHEMA = os.environ.get("TRINO_SCHEMA", "ipl")
+TRINO_HTTP_SCHEME = os.environ.get("TRINO_HTTP_SCHEME", "http")
+
 # Ensure checkpoint directory exists
 ICEBERG_CHECKPOINT_PATH.mkdir(parents=True, exist_ok=True)
 

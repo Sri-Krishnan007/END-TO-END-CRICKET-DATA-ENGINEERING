@@ -137,6 +137,25 @@ services:
       - NESSIE_SERVER_AUTHENTICATION_ENABLED=false
       - NESSIE_VERSION_STORE_TYPE=IN_MEMORY
 
+  # 8. Trino Query Engine (Lakehouse Serving Layer on Port 8085)
+  trino:
+    image: trinodb/trino:435
+    container_name: ipl-trino
+    depends_on:
+      nessie:
+        condition: service_started
+      minio:
+        condition: service_healthy
+    ports:
+      - "8085:8080"
+    volumes:
+      - ./trino/catalog:/etc/trino/catalog:ro
+    healthcheck:
+      test: ["CMD-SHELL", "trino --execute 'SELECT 1' || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
 volumes:
   minio_data:
 

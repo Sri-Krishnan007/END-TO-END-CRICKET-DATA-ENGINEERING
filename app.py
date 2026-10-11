@@ -21,6 +21,7 @@ from routes.pipeline import pipeline_bp
 from routes.analytics import analytics_bp
 from routes.api import api_bp
 from routes.bpm import bpm_bp
+from routes.lakehouse import lakehouse_bp
 
 app.register_blueprint(home_bp)
 app.register_blueprint(ingestion_bp, url_for_security=True)
@@ -28,6 +29,7 @@ app.register_blueprint(pipeline_bp)
 app.register_blueprint(analytics_bp)
 app.register_blueprint(api_bp)
 app.register_blueprint(bpm_bp)
+app.register_blueprint(lakehouse_bp)
 
 @app.route('/')
 def index_redirect():

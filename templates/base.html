@@ -64,6 +64,12 @@
                         <span>Process BPM Analytics</span>
                     </a>
                 </li>
+                <li class="{% if request.blueprint == 'lakehouse' %}active{% endif %}">
+                    <a href="{{ url_for('lakehouse.lakehouse_dashboard') }}">
+                        <i class="fa-solid fa-water"></i>
+                        <span>Lakehouse Trino Serving</span>
+                    </a>
+                </li>
             </ul>
 
             <!-- Active Database Status Card in Sidebar -->

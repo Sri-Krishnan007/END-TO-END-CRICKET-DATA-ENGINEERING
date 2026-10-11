@@ -25,6 +25,11 @@ STAGE_SLAS = {
     "lakehouse": float(os.environ.get("SLA_LAKEHOUSE_SECONDS", 20.0)),
     "lakehouse_sync": float(os.environ.get("SLA_LAKEHOUSE_SECONDS", 20.0)),
     "lakehouse_streaming_ingest": float(os.environ.get("SLA_LAKEHOUSE_SECONDS", 20.0)),
+    "lakehouse_health_check": float(os.environ.get("SLA_LAKEHOUSE_SECONDS", 10.0)),
+    "lakehouse_compaction": float(os.environ.get("SLA_LAKEHOUSE_SECONDS", 30.0)),
+    "lakehouse_snapshot_expiry": float(os.environ.get("SLA_LAKEHOUSE_SECONDS", 15.0)),
+    "lakehouse_orphan_cleanup": float(os.environ.get("SLA_LAKEHOUSE_SECONDS", 15.0)),
+    "lakehouse_maintenance_audit": float(os.environ.get("SLA_LAKEHOUSE_SECONDS", 10.0)),
     "quarantine": float(os.environ.get("SLA_QUARANTINE_SECONDS", 10.0)),
     "total_pipeline": float(os.environ.get("SLA_TOTAL_PIPELINE_SECONDS", 180.0))
 }
@@ -60,7 +65,7 @@ FINE_GRAINED_SEQUENCE = [
 # Valid directed transitions graph (Source -> Target set)
 # Includes happy paths and legitimate exception paths (e.g. validation -> quarantine)
 VALID_TRANSITIONS = {
-    "init": {"bronze", "source_ingestion", "staging"},
+    "init": {"bronze", "source_ingestion", "staging", "lakehouse_health_check"},
     "bronze": {"staging", "kafka_producer", "validation"},
     "source_ingestion": {"kafka_producer", "staging"},
     "kafka_producer": {"kafka_consumer", "staging"},
@@ -74,14 +79,22 @@ VALID_TRANSITIONS = {
     "gold": {"done", "end", "serving", "bronze", "staging", "source_ingestion", "lakehouse", "lakehouse_sync"},
     "gold_load": {"done", "end", "serving", "bronze", "staging", "source_ingestion", "lakehouse", "lakehouse_sync"},
     "lakehouse": {"done", "end", "serving", "bronze", "staging", "source_ingestion"},
-    "lakehouse_sync": {"done", "end", "serving", "bronze", "staging", "source_ingestion"}
+    "lakehouse_sync": {"done", "end", "serving", "bronze", "staging", "source_ingestion"},
+    # Lakehouse Maintenance workflow transitions
+    "lakehouse_health_check": {"lakehouse_compaction", "done", "end"},
+    "lakehouse_compaction": {"lakehouse_snapshot_expiry", "done", "end"},
+    "lakehouse_snapshot_expiry": {"lakehouse_orphan_cleanup", "done", "end"},
+    "lakehouse_orphan_cleanup": {"lakehouse_maintenance_audit", "done", "end"},
+    "lakehouse_maintenance_audit": {"done", "end"}
 }
 
 # Stages where activity repetition constitutes legitimate replay/retry
 ALLOWED_RETRY_STAGES = {
     "bronze", "source_ingestion", "produce", "consume",
     "staging", "validation", "cdc", "silver", "silver_load", 
-    "gold", "gold_load", "lakehouse", "lakehouse_sync", "lakehouse_streaming_ingest"
+    "gold", "gold_load", "lakehouse", "lakehouse_sync", "lakehouse_streaming_ingest",
+    "lakehouse_health_check", "lakehouse_compaction", "lakehouse_snapshot_expiry", 
+    "lakehouse_orphan_cleanup", "lakehouse_maintenance_audit"
 }
 
 

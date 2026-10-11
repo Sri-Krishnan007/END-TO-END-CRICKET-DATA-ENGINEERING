@@ -1,0 +1,468 @@
+{% extends 'base.html' %}
+
+{% block title %}Lakehouse Trino Serving | IPL Data Platform{% endblock %}
+{% block header_title %}Lakehouse Trino Serving & Analytics{% endblock %}
+
+{% block content %}
+<div class="lakehouse-container" style="display: flex; flex-direction: column; gap: 24px; padding-bottom: 40px;">
+
+    <!-- TOP BAR: Status, Engine Info & Filters -->
+    <div class="glass-card" style="padding: 20px 24px; display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 16px;">
+        <div style="display: flex; align-items: center; gap: 16px;">
+            <div style="width: 48px; height: 48px; border-radius: 12px; background: linear-gradient(135deg, #00d2ff22, #00f2fe33); display: flex; align-items: center; justify-content: center; border: 1px solid rgba(0, 210, 255, 0.4);">
+                <i class="fa-solid fa-water" style="font-size: 1.5rem; color: #00d2ff;"></i>
+            </div>
+            <div>
+                <h3 style="margin: 0; font-size: 1.25rem; font-weight: 700;">Apache Iceberg Lakehouse Serving</h3>
+                <p style="margin: 4px 0 0; font-size: 0.85rem; color: var(--text-secondary);">
+                    Catalog: <code style="color: #00d2ff;">{{ trino_catalog }}.{{ trino_schema }}</code> | Storage: <code style="color: #39ff14;">MinIO S3 (warehouse)</code> | Engine: 
+                    <span id="engine-badge" class="badge" style="background: rgba(0, 210, 255, 0.15); color: #00d2ff; border: 1px solid rgba(0, 210, 255, 0.3); font-size: 0.75rem; padding: 2px 8px; border-radius: 4px;">
+                        {% if trino_status.connected %}Trino Distributed SQL ({{ trino_status.version }}){% else %}Lakehouse Parquet S3 Storage{% endif %}
+                    </span>
+                </p>
+            </div>
+        </div>
+
+        <div style="display: flex; align-items: center; gap: 14px; flex-wrap: wrap;">
+            <!-- Connection Status Pill -->
+            <div id="trino-health-pill" style="display: flex; align-items: center; gap: 8px; padding: 6px 14px; border-radius: 20px; font-size: 0.82rem; font-weight: 600; 
+                {% if trino_status.connected %}
+                    background: rgba(57, 255, 20, 0.12); color: #39ff14; border: 1px solid rgba(57, 255, 20, 0.3);
+                {% else %}
+                    background: rgba(255, 170, 0, 0.15); color: #ffaa00; border: 1px solid rgba(255, 170, 0, 0.3);
+                {% endif %}">
+                <span style="width: 8px; height: 8px; border-radius: 50%; background: {% if trino_status.connected %}#39ff14{% else %}#ffaa00{% endif %}; display: inline-block;"></span>
+                <span id="trino-status-text">{% if trino_status.connected %}Trino Live ({{ trino_status.latency_ms }} ms){% else %}Trino Offline (Direct Fallback){% endif %}</span>
+            </div>
+
+            <!-- Season Filter Dropdown -->
+            <div style="display: flex; align-items: center; gap: 8px;">
+                <label for="lakehouse-season-select" style="font-size: 0.85rem; color: var(--text-secondary); font-weight: 600;">Season:</label>
+                <select id="lakehouse-season-select" onchange="onSeasonChanged()" style="background: rgba(18, 25, 38, 0.8); border: 1px solid var(--border-color); color: var(--text-primary); padding: 8px 14px; border-radius: 8px; font-size: 0.88rem; outline: none; cursor: pointer;">
+                    <option value="all">All Available Seasons</option>
+                    {% for s in seasons %}
+                    <option value="{{ s }}">Season {{ s }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <button onclick="refreshLakehouseData()" class="btn-secondary" style="padding: 8px 12px; font-size: 0.85rem; display: flex; align-items: center; gap: 6px;">
+                <i class="fa-solid fa-arrows-rotate" id="refresh-icon"></i> Refresh
+            </button>
+        </div>
+    </div>
+
+    <!-- METRIC CARDS -->
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 18px;">
+        <!-- Card 1: Matches -->
+        <div class="glass-card stat-card" style="padding: 20px; border-left: 4px solid #00d2ff;">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <span style="color: var(--text-secondary); font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.05em; font-weight: 600;">Iceberg Matches</span>
+                <i class="fa-solid fa-trophy" style="color: #00d2ff; font-size: 1.2rem;"></i>
+            </div>
+            <div id="stat-matches" style="font-size: 2.2rem; font-weight: 800; color: #fff; margin-top: 8px;">
+                {{ overview.total_matches | default(0) }}
+            </div>
+            <div style="font-size: 0.78rem; color: var(--text-secondary); margin-top: 4px;">
+                Table: <code>{{ table_name }}</code>
+            </div>
+        </div>
+
+        <!-- Card 2: Total Runs -->
+        <div class="glass-card stat-card" style="padding: 20px; border-left: 4px solid #39ff14;">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <span style="color: var(--text-secondary); font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.05em; font-weight: 600;">Total Runs Scored</span>
+                <i class="fa-solid fa-baseball-bat-ball" style="color: #39ff14; font-size: 1.2rem;"></i>
+            </div>
+            <div id="stat-runs" style="font-size: 2.2rem; font-weight: 800; color: #fff; margin-top: 8px;">
+                {{ overview.total_runs | default(0) }}
+            </div>
+            <div style="font-size: 0.78rem; color: #39ff14; margin-top: 4px;">
+                Aggregated via Lakehouse Query
+            </div>
+        </div>
+
+        <!-- Card 3: Total Wickets -->
+        <div class="glass-card stat-card" style="padding: 20px; border-left: 4px solid #ff007f;">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <span style="color: var(--text-secondary); font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.05em; font-weight: 600;">Total Wickets</span>
+                <i class="fa-solid fa-crosshairs" style="color: #ff007f; font-size: 1.2rem;"></i>
+            </div>
+            <div id="stat-wickets" style="font-size: 2.2rem; font-weight: 800; color: #fff; margin-top: 8px;">
+                {{ overview.total_wickets | default(0) }}
+            </div>
+            <div style="font-size: 0.78rem; color: var(--text-secondary); margin-top: 4px;">
+                Outlier & DQ Validated
+            </div>
+        </div>
+
+        <!-- Card 4: Total Overs -->
+        <div class="glass-card stat-card" style="padding: 20px; border-left: 4px solid #ffaa00;">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <span style="color: var(--text-secondary); font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.05em; font-weight: 600;">Total Overs Bowled</span>
+                <i class="fa-solid fa-stopwatch" style="color: #ffaa00; font-size: 1.2rem;"></i>
+            </div>
+            <div id="stat-overs" style="font-size: 2.2rem; font-weight: 800; color: #fff; margin-top: 8px;">
+                {{ overview.total_overs | default(0) }}
+            </div>
+            <div style="font-size: 0.78rem; color: var(--text-secondary); margin-top: 4px;">
+                Partitioned by <code>season</code>
+            </div>
+        </div>
+    </div>
+
+    <!-- CHARTS SECTION: 2 COLUMNS -->
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(460px, 1fr)); gap: 20px;">
+        <!-- Chart 1: Season Trends -->
+        <div class="glass-card" style="padding: 22px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+                <div>
+                    <h4 style="margin: 0; font-size: 1.05rem; font-weight: 700;">Tournament Scale by Season</h4>
+                    <p style="margin: 2px 0 0; font-size: 0.78rem; color: var(--text-secondary);">Matches and aggregate run production across seasons</p>
+                </div>
+                <span style="font-size: 0.75rem; background: rgba(0, 210, 255, 0.1); color: #00d2ff; padding: 2px 8px; border-radius: 4px;">Trino SQL</span>
+            </div>
+            <div style="height: 280px; position: relative;">
+                <canvas id="seasonTrendsChart"></canvas>
+            </div>
+        </div>
+
+        <!-- Chart 2: Wins by Team -->
+        <div class="glass-card" style="padding: 22px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+                <div>
+                    <h4 style="margin: 0; font-size: 1.05rem; font-weight: 700;">Franchise Match Victories</h4>
+                    <p style="margin: 2px 0 0; font-size: 0.78rem; color: var(--text-secondary);">Top winning franchises from Iceberg match outcomes</p>
+                </div>
+                <span style="font-size: 0.75rem; background: rgba(57, 255, 20, 0.1); color: #39ff14; padding: 2px 8px; border-radius: 4px;">Trino SQL</span>
+            </div>
+            <div style="height: 280px; position: relative;">
+                <canvas id="teamWinsChart"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <!-- SECOND CHARTS ROW: Venues & SQL Console -->
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(460px, 1fr)); gap: 20px;">
+        <!-- Chart 3: Top Venues -->
+        <div class="glass-card" style="padding: 22px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+                <div>
+                    <h4 style="margin: 0; font-size: 1.05rem; font-weight: 700;">Stadium Utilization & Scoring</h4>
+                    <p style="margin: 2px 0 0; font-size: 0.78rem; color: var(--text-secondary);">Top IPL stadiums by match count</p>
+                </div>
+                <span style="font-size: 0.75rem; background: rgba(255, 170, 0, 0.1); color: #ffaa00; padding: 2px 8px; border-radius: 4px;">Trino SQL</span>
+            </div>
+            <div style="height: 280px; position: relative;">
+                <canvas id="venueChart"></canvas>
+            </div>
+        </div>
+
+        <!-- Interactive Trino SQL Query Console -->
+        <div class="glass-card" style="padding: 22px; display: flex; flex-direction: column;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                <div>
+                    <h4 style="margin: 0; font-size: 1.05rem; font-weight: 700;"><i class="fa-solid fa-terminal" style="color: #00d2ff;"></i> Live Trino SQL Console</h4>
+                    <p style="margin: 2px 0 0; font-size: 0.78rem; color: var(--text-secondary);">Execute analytical queries against the Iceberg Lakehouse</p>
+                </div>
+                <span id="query-latency-tag" style="font-size: 0.75rem; background: rgba(255, 255, 255, 0.08); color: var(--text-secondary); padding: 2px 8px; border-radius: 4px;">Ready</span>
+            </div>
+
+            <!-- Quick Template Buttons -->
+            <div style="display: flex; gap: 8px; margin-bottom: 10px; flex-wrap: wrap;">
+                <button type="button" class="btn-pill" onclick="setQueryTemplate(1)" style="font-size: 0.75rem; padding: 4px 10px; background: rgba(255, 255, 255, 0.05); border: 1px solid var(--border-color); color: var(--text-primary); border-radius: 12px; cursor: pointer;">
+                    Select 10 Matches
+                </button>
+                <button type="button" class="btn-pill" onclick="setQueryTemplate(2)" style="font-size: 0.75rem; padding: 4px 10px; background: rgba(255, 255, 255, 0.05); border: 1px solid var(--border-color); color: var(--text-primary); border-radius: 12px; cursor: pointer;">
+                    Season Aggregates
+                </button>
+                <button type="button" class="btn-pill" onclick="setQueryTemplate(3)" style="font-size: 0.75rem; padding: 4px 10px; background: rgba(255, 255, 255, 0.05); border: 1px solid var(--border-color); color: var(--text-primary); border-radius: 12px; cursor: pointer;">
+                    Table Partitions
+                </button>
+            </div>
+
+            <textarea id="trino-sql-input" rows="4" style="width: 100%; background: #0c121e; border: 1px solid rgba(0, 210, 255, 0.3); color: #39ff14; font-family: 'Courier New', monospace; font-size: 0.88rem; padding: 10px; border-radius: 8px; resize: vertical; box-sizing: border-box; outline: none;">SELECT season, COUNT(*) AS match_count, SUM(total_runs) AS runs FROM iceberg.ipl.ipl_matches GROUP BY season ORDER BY season DESC</textarea>
+
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 10px;">
+                <span id="query-status-note" style="font-size: 0.78rem; color: var(--text-secondary);">Target: {{ trino_catalog }}.{{ trino_schema }}.ipl_matches</span>
+                <button type="button" onclick="executeCustomTrinoQuery()" id="btn-run-query" class="btn-primary" style="padding: 8px 18px; font-size: 0.85rem; display: flex; align-items: center; gap: 8px;">
+                    <i class="fa-solid fa-play"></i> Run Trino Query
+                </button>
+            </div>
+
+            <!-- Query Output Area -->
+            <div id="query-result-box" style="margin-top: 12px; flex: 1; max-height: 180px; overflow: auto; background: #090e17; border: 1px solid var(--border-color); border-radius: 6px; padding: 8px; font-size: 0.78rem; font-family: monospace;">
+                <span style="color: var(--text-secondary);">Query results will appear here...</span>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Chart.js CDN -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<script>
+let seasonChart = null;
+let teamChart = null;
+let venueChart = null;
+
+document.addEventListener("DOMContentLoaded", () => {
+    loadCharts();
+});
+
+function onSeasonChanged() {
+    const season = document.getElementById("lakehouse-season-select").value;
+    updateOverviewCards(season);
+    updateTeamChart(season);
+    updateVenueChart(season);
+}
+
+function refreshLakehouseData() {
+    const icon = document.getElementById("refresh-icon");
+    icon.classList.add("fa-spin");
+    const season = document.getElementById("lakehouse-season-select").value;
+    
+    Promise.all([
+        updateOverviewCards(season),
+        loadCharts()
+    ]).finally(() => {
+        setTimeout(() => icon.classList.remove("fa-spin"), 600);
+    });
+}
+
+function updateOverviewCards(season) {
+    return fetch(`/api/lakehouse/overview?season=${season}`)
+        .then(r => r.json())
+        .then(res => {
+            if (res.success && res.data) {
+                const d = res.data;
+                document.getElementById("stat-matches").innerText = (d.total_matches || 0).toLocaleString();
+                document.getElementById("stat-runs").innerText = (d.total_runs || 0).toLocaleString();
+                document.getElementById("stat-wickets").innerText = (d.total_wickets || 0).toLocaleString();
+                document.getElementById("stat-overs").innerText = (d.total_overs || 0).toLocaleString();
+                
+                // Update badge
+                const badge = document.getElementById("engine-badge");
+                if (res.engine === "trino_distributed_sql") {
+                    badge.innerText = `Trino SQL (${res.latency_ms} ms)`;
+                    badge.style.color = "#00d2ff";
+                } else {
+                    badge.innerText = "Lakehouse S3 Parquet";
+                    badge.style.color = "#ffaa00";
+                }
+            }
+        })
+        .catch(err => console.error("Failed to load lakehouse overview:", err));
+}
+
+function loadCharts() {
+    loadSeasonTrends();
+    const season = document.getElementById("lakehouse-season-select").value;
+    updateTeamChart(season);
+    updateVenueChart(season);
+}
+
+function loadSeasonTrends() {
+    fetch('/api/lakehouse/season-trends')
+        .then(r => r.json())
+        .then(res => {
+            if (!res.success || !res.records || res.records.length === 0) return;
+            const records = res.records;
+            const labels = records.map(r => `Season ${r.season}`);
+            const matchCounts = records.map(r => r.match_count);
+            const runTotals = records.map(r => r.total_runs);
+
+            const ctx = document.getElementById('seasonTrendsChart').getContext('2d');
+            if (seasonChart) seasonChart.destroy();
+
+            seasonChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [
+                        {
+                            label: 'Matches Played',
+                            data: matchCounts,
+                            backgroundColor: 'rgba(0, 210, 255, 0.7)',
+                            borderColor: '#00d2ff',
+                            borderWidth: 1,
+                            borderRadius: 4,
+                            yAxisID: 'y'
+                        },
+                        {
+                            label: 'Total Runs Scored',
+                            data: runTotals,
+                            type: 'line',
+                            borderColor: '#39ff14',
+                            backgroundColor: 'rgba(57, 255, 20, 0.1)',
+                            borderWidth: 2,
+                            pointRadius: 4,
+                            pointBackgroundColor: '#39ff14',
+                            tension: 0.3,
+                            yAxisID: 'y1'
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#8fa0b5', font: { size: 10 } } },
+                        y: { position: 'left', grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#00d2ff' } },
+                        y1: { position: 'right', grid: { display: false }, ticks: { color: '#39ff14' } }
+                    },
+                    plugins: { legend: { labels: { color: '#c5d3e8', font: { size: 11 } } } }
+                }
+            });
+        })
+        .catch(err => console.error("Error loading season trends:", err));
+}
+
+function updateTeamChart(season) {
+    fetch(`/api/lakehouse/team-wins?season=${season}`)
+        .then(r => r.json())
+        .then(res => {
+            if (!res.success || !res.records) return;
+            const records = res.records;
+            const labels = records.map(r => r.team);
+            const wins = records.map(r => r.wins);
+
+            const ctx = document.getElementById('teamWinsChart').getContext('2d');
+            if (teamChart) teamChart.destroy();
+
+            teamChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Victories',
+                        data: wins,
+                        backgroundColor: 'rgba(57, 255, 20, 0.7)',
+                        borderColor: '#39ff14',
+                        borderWidth: 1,
+                        borderRadius: 4
+                    }]
+                },
+                options: {
+                    indexAxis: 'y',
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        x: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#8fa0b5' } },
+                        y: { grid: { display: false }, ticks: { color: '#c5d3e8', font: { size: 10 } } }
+                    },
+                    plugins: { legend: { display: false } }
+                }
+            });
+        })
+        .catch(err => console.error("Error loading team wins:", err));
+}
+
+function updateVenueChart(season) {
+    fetch(`/api/lakehouse/venues?season=${season}`)
+        .then(r => r.json())
+        .then(res => {
+            if (!res.success || !res.records) return;
+            const records = res.records;
+            const labels = records.map(r => r.venue.length > 22 ? r.venue.substring(0, 22) + '...' : r.venue);
+            const hosted = records.map(r => r.matches_hosted);
+
+            const ctx = document.getElementById('venueChart').getContext('2d');
+            if (venueChart) venueChart.destroy();
+
+            venueChart = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        data: hosted,
+                        backgroundColor: [
+                            '#00d2ff', '#39ff14', '#ff007f', '#ffaa00', '#9d4edd',
+                            '#00f2fe', '#48cae4', '#70e000', '#ff4d6d', '#ffd166'
+                        ],
+                        borderWidth: 0
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { position: 'right', labels: { color: '#c5d3e8', font: { size: 9 }, boxWidth: 10 } }
+                    }
+                }
+            });
+        })
+        .catch(err => console.error("Error loading venues:", err));
+}
+
+function setQueryTemplate(id) {
+    const input = document.getElementById("trino-sql-input");
+    if (id === 1) {
+        input.value = "SELECT match_id, season, match_date, team1, team2, winner, total_runs FROM iceberg.ipl.ipl_matches LIMIT 10";
+    } else if (id === 2) {
+        input.value = "SELECT season, COUNT(*) AS matches, SUM(total_runs) AS runs, SUM(total_wickets) AS wickets FROM iceberg.ipl.ipl_matches GROUP BY season ORDER BY season ASC";
+    } else if (id === 3) {
+        input.value = "SELECT \"partition\", record_count, file_count FROM iceberg.ipl.\"ipl_matches$partitions\"";
+    }
+}
+
+function executeCustomTrinoQuery() {
+    const query = document.getElementById("trino-sql-input").value.trim();
+    const btn = document.getElementById("btn-run-query");
+    const resultBox = document.getElementById("query-result-box");
+    const latencyTag = document.getElementById("query-latency-tag");
+
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Executing...';
+    resultBox.innerHTML = '<span style="color: #00d2ff;"><i class="fa-solid fa-spinner fa-spin"></i> Executing query against Trino cluster...</span>';
+
+    fetch('/api/lakehouse/query', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query: query })
+    })
+    .then(r => r.json())
+    .then(res => {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fa-solid fa-play"></i> Run Trino Query';
+
+        if (res.success) {
+            latencyTag.innerText = `${res.latency_ms} ms (${res.row_count} rows)`;
+            latencyTag.style.color = '#39ff14';
+
+            if (res.records.length === 0) {
+                resultBox.innerHTML = '<span style="color: #ffaa00;">Query succeeded: 0 rows returned.</span>';
+                return;
+            }
+
+            // Render HTML table
+            let tableHtml = '<table style="width: 100%; border-collapse: collapse; text-align: left;"><thead><tr style="border-bottom: 1px solid #334155; color: #00d2ff;">';
+            res.columns.forEach(c => {
+                tableHtml += `<th style="padding: 4px 8px;">${c}</th>`;
+            });
+            tableHtml += '</tr></thead><tbody>';
+
+            res.records.forEach(row => {
+                tableHtml += '<tr style="border-bottom: 1px solid rgba(255,255,255,0.05); color: #cbd5e1;">';
+                res.columns.forEach(c => {
+                    tableHtml += `<td style="padding: 3px 8px;">${row[c] !== null ? row[c] : '<span style="color:#64748b;">null</span>'}</td>`;
+                });
+                tableHtml += '</tr>';
+            });
+            tableHtml += '</tbody></table>';
+            resultBox.innerHTML = tableHtml;
+        } else {
+            latencyTag.innerText = `Error (${res.latency_ms || 0} ms)`;
+            latencyTag.style.color = '#ff007f';
+            resultBox.innerHTML = `<span style="color: #ff007f;"><strong>Query Error:</strong> ${res.error}</span>`;
+        }
+    })
+    .catch(err => {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="fa-solid fa-play"></i> Run Trino Query';
+        latencyTag.innerText = 'Failed';
+        resultBox.innerHTML = `<span style="color: #ff007f;">Request failed: ${err.message}</span>`;
+    });
+}
+</script>
+{% endblock %}

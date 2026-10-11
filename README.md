@@ -74,21 +74,31 @@ flowchart TD
         Q -->|Upsert Facts & Dimensions| R[(FACT_MATCH_SUMMARY / DIM_PLAYER / DIM_TEAM)]
     end
 
-    subgraph Serving & UI [Monitoring & Analytics]
-        R --> S[Flask Web Portal / Analytics Dashboard]
-        R --> T[Power BI / BI Repo]
+    subgraph Lakehouse Layer [Apache Iceberg + Nessie + MinIO S3]
+        G -->|PySpark Structured Streaming Sink| LH1[Apache Iceberg Table: ipl.ipl_matches]
+        LH1 -->|Catalog Metadata & Git Commits| LH2[Project Nessie REST Catalog :19120]
+        LH1 -->|Parquet Data & Snapshots| LH3[MinIO S3 Object Storage :9000]
+    end
 
+    subgraph Serving & Optimization [Trino Query Engine & Airflow Maintenance]
+        LH1 -->|Distributed SQL Engine| TR[Trino Query Engine :8085]
+        TR --> S[Flask Web Portal / Lakehouse Dashboard]
+        R --> S
+        R --> T[Power BI / BI Repo]
+        AF[Airflow Maintenance DAG] -->|OPTIMIZE, Expire Snapshots, Vacuum| TR
+    end
 ```
 
 ---
 
 ## 🔄 End-to-End Pipeline Workflow
 
-The pipeline executes through sequential, monitored stages orchestrated by **Apache Airflow**:
+The complete enterprise pipeline executes through monitored stages orchestrated by **Apache Airflow**:
 
 ```
-[Start] ➡️ [Bronze Ingestion] ➡️ [Kafka Producer] ➡️ [Kafka Consumer] ➡️ [Data Validation] ➡️ [CDC Detection] ➡️ [Atomic Silver/Gold Load] ➡️ [End]
+[Start] ➡️ [Bronze Ingestion] ➡️ [Kafka Producer] ➡️ [Kafka Consumer] ➡️ [Data Validation] ➡️ [CDC Detection] ➡️ [Atomic Silver/Gold Load] ➡️ [Iceberg Lakehouse Sync] ➡️ [Trino Serving] ➡️ [Lakehouse Maintenance] ➡️ [End]
 ```
+
 
 1. **Bronze Ingestion:** Downloads raw data from Cricsheet, generates file checksums, registers source metadata in `source_registry`.
 2. **Kafka Producer:** Reads raw match documents and streams them as serialized JSON payloads into the `ipl_matches` Kafka topic.

@@ -19,7 +19,8 @@ except ImportError:
         def __rshift__(self, other): return other
         def __lshift__(self, other): return other
     class DAG:
-        def __init__(self, *args, **kwargs): pass
+        def __init__(self, *args, **kwargs):
+            self.dag_id = args[0] if args else kwargs.get('dag_id', 'unknown')
         def __enter__(self): return self
         def __exit__(self, *args): pass
     class PythonOperator(DummyOperator): pass
